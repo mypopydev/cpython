@@ -175,9 +175,10 @@ class SyntaxTracebackCases(unittest.TestCase):
                     text, charset, 5)
             do_test(" \t\f\n# coding: {0}\n".format(charset),
                     text, charset, 5)
-        # Issue #18960: coding spec should has no effect
+        # Issue #18960: coding spec should have no effect
         do_test("x=0\n# coding: GBK\n", "h\xe9 ho", 'utf-8', 5)
 
+    @support.requires_type_collecting
     def test_print_traceback_at_exit(self):
         # Issue #22599: Ensure that it is possible to use the traceback module
         # to display an exception at Python exit

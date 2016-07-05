@@ -4,6 +4,8 @@
 .. module:: typing
    :synopsis: Support for type hints (see PEP 484).
 
+.. versionadded:: 3.5
+
 **Source code:** :source:`Lib/typing.py`
 
 --------------
@@ -154,7 +156,7 @@ You can use multiple inheritance with :class:`Generic`::
    class LinkedList(Sized, Generic[T]):
        ...
 
-When inheriting from generic classes, some type variables could fixed::
+When inheriting from generic classes, some type variables could be fixed::
 
     from typing import TypeVar, Mapping
 
@@ -295,7 +297,7 @@ The module defines the following classes, functions and decorators:
 
 .. class:: Tuple
 
-  Tuple type; ``Tuple[X, Y]`` is the is the type of a tuple of two items
+  Tuple type; ``Tuple[X, Y]`` is the type of a tuple of two items
   with the first item of type X and the second of type Y.
 
   Example: ``Tuple[T1, T2]`` is a tuple of two elements corresponding
@@ -345,11 +347,15 @@ The module defines the following classes, functions and decorators:
 
 .. class:: Iterable(Generic[T_co])
 
-    A generic version of the :class:`collections.abc.Iterable`.
+    A generic version of :class:`collections.abc.Iterable`.
 
 .. class:: Iterator(Iterable[T_co])
 
-    A generic version of the :class:`collections.abc.Iterator`.
+    A generic version of :class:`collections.abc.Iterator`.
+
+.. class:: Reversible(Iterable[T_co])
+
+    A generic version of :class:`collections.abc.Reversible`.
 
 .. class:: SupportsInt
 
@@ -368,11 +374,6 @@ The module defines the following classes, functions and decorators:
 
     An ABC with one abstract method ``__round__``
     that is covariant in its return type.
-
-.. class:: Reversible
-
-    An ABC with one abstract method ``__reversed__`` returning
-    an ``Iterator[T_co]``.
 
 .. class:: Container(Generic[T_co])
 
@@ -394,7 +395,7 @@ The module defines the following classes, functions and decorators:
 
     A generic version of :class:`collections.abc.MutableMapping`.
 
-.. class:: Sequence(Sized, Iterable[T_co], Container[T_co])
+.. class:: Sequence(Sized, Reversible[T_co], Container[T_co])
 
     A generic version of :class:`collections.abc.Sequence`.
 
@@ -426,12 +427,12 @@ The module defines the following classes, functions and decorators:
       def vec2(x: T, y: T) -> List[T]:
           return [x, y]
 
-      def slice__to_4(vector: Sequence[T]) -> List[T]:
-          return vector[0:4]
+      def keep_positives(vector: Sequence[T]) -> List[T]:
+          return [item for item in vector if item > 0]
 
-.. class:: AbstractSet(set, MutableSet[T])
+.. class:: Set(set, MutableSet[T])
 
-   A generic version of :class:`collections.abc.Set`.
+   A generic version of :class:`builtins.set <set>`.
 
 .. class:: MappingView(Sized, Iterable[T_co])
 
@@ -448,6 +449,12 @@ The module defines the following classes, functions and decorators:
 .. class:: ValuesView(MappingView[VT_co])
 
    A generic version of :class:`collections.abc.ValuesView`.
+
+.. class:: ContextManager(Generic[T_co])
+
+   A generic version of :class:`contextlib.AbstractContextManager`.
+
+   .. versionadded:: 3.6
 
 .. class:: Dict(dict, MutableMapping[KT, VT])
 

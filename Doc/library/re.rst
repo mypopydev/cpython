@@ -3,16 +3,20 @@
 
 .. module:: re
    :synopsis: Regular expression operations.
+
 .. moduleauthor:: Fredrik Lundh <fredrik@pythonware.com>
 .. sectionauthor:: Andrew M. Kuchling <amk@amk.ca>
 
+**Source code:** :source:`Lib/re.py`
+
+--------------
 
 This module provides regular expression matching operations similar to
 those found in Perl.
 
 Both patterns and strings to be searched can be Unicode strings as well as
 8-bit strings. However, Unicode strings and 8-bit strings cannot be mixed:
-that is, you cannot match an Unicode string with a byte pattern or
+that is, you cannot match a Unicode string with a byte pattern or
 vice-versa; similarly, when asking for a substitution, the replacement
 string must be of the same type as both the pattern and the search string.
 
@@ -113,11 +117,11 @@ The special characters are:
 ``*?``, ``+?``, ``??``
    The ``'*'``, ``'+'``, and ``'?'`` qualifiers are all :dfn:`greedy`; they match
    as much text as possible.  Sometimes this behaviour isn't desired; if the RE
-   ``<.*>`` is matched against ``'<H1>title</H1>'``, it will match the entire
-   string, and not just ``'<H1>'``.  Adding ``'?'`` after the qualifier makes it
+   ``<.*>`` is matched against ``<a> b <c>``, it will match the entire
+   string, and not just ``<a>``.  Adding ``?`` after the qualifier makes it
    perform the match in :dfn:`non-greedy` or :dfn:`minimal` fashion; as *few*
-   characters as possible will be matched.  Using ``.*?`` in the previous
-   expression will match only ``'<H1>'``.
+   characters as possible will be matched.  Using the RE ``<.*?>`` will match
+   only ``<a>``.
 
 ``{m}``
    Specifies that exactly *m* copies of the previous RE should be matched; fewer
@@ -317,8 +321,9 @@ The special characters are:
 
 
 The special sequences consist of ``'\'`` and a character from the list below.
-If the ordinary character is not on the list, then the resulting RE will match
-the second character.  For example, ``\$`` matches the character ``'$'``.
+If the ordinary character is not an ASCII digit or an ASCII letter, then the
+resulting RE will match the second character.  For example, ``\$`` matches the
+character ``'$'``.
 
 ``\number``
    Matches the contents of the group of the same number.  Groups are numbered
@@ -438,9 +443,8 @@ three digits in length.
 .. versionchanged:: 3.3
    The ``'\u'`` and ``'\U'`` escape sequences have been added.
 
-.. deprecated-removed:: 3.5 3.6
-   Unknown escapes consist of ``'\'`` and ASCII letter now raise a
-   deprecation warning and will be forbidden in Python 3.6.
+.. versionchanged:: 3.6
+   Unknown escapes consisting of ``'\'`` and an ASCII letter now are errors.
 
 
 .. seealso::
@@ -528,11 +532,11 @@ form.
    current locale. The use of this flag is discouraged as the locale mechanism
    is very unreliable, and it only handles one "culture" at a time anyway;
    you should use Unicode matching instead, which is the default in Python 3
-   for Unicode (str) patterns. This flag makes sense only with bytes patterns.
+   for Unicode (str) patterns. This flag can be used only with bytes patterns.
 
-   .. deprecated-removed:: 3.5 3.6
-      Deprecated the use of  :const:`re.LOCALE` with string patterns or
-      :const:`re.ASCII`.
+   .. versionchanged:: 3.6
+      :const:`re.LOCALE` can be used only with bytes patterns and is
+      not compatible with :const:`re.ASCII`.
 
 
 .. data:: M
@@ -738,9 +742,8 @@ form.
    .. versionchanged:: 3.5
       Unmatched groups are replaced with an empty string.
 
-   .. deprecated-removed:: 3.5 3.6
-      Unknown escapes consist of ``'\'`` and ASCII letter now raise a
-      deprecation warning and will be forbidden in Python 3.6.
+   .. versionchanged:: 3.6
+      Unknown escapes consisting of ``'\'`` and an ASCII letter now are errors.
 
 
 .. function:: subn(pattern, repl, string, count=0, flags=0)
@@ -811,8 +814,8 @@ attributes:
 
 .. method:: regex.search(string[, pos[, endpos]])
 
-   Scan through *string* looking for a location where this regular expression
-   produces a match, and return a corresponding :ref:`match object
+   Scan through *string* looking for the first location where this regular
+   expression produces a match, and return a corresponding :ref:`match object
    <match-objects>`.  Return ``None`` if no position in the string matches the
    pattern; note that this is different from finding a zero-length match at some
    point in the string.
@@ -1234,15 +1237,15 @@ does by default).
 
 For example::
 
-   >>> re.match("c", "abcdef")  # No match
-   >>> re.search("c", "abcdef") # Match
+   >>> re.match("c", "abcdef")    # No match
+   >>> re.search("c", "abcdef")   # Match
    <_sre.SRE_Match object; span=(2, 3), match='c'>
 
 Regular expressions beginning with ``'^'`` can be used with :func:`search` to
 restrict the match at the beginning of the string::
 
-   >>> re.match("c", "abcdef")  # No match
-   >>> re.search("^c", "abcdef") # No match
+   >>> re.match("c", "abcdef")    # No match
+   >>> re.search("^c", "abcdef")  # No match
    >>> re.search("^a", "abcdef")  # Match
    <_sre.SRE_Match object; span=(0, 1), match='a'>
 
@@ -1323,9 +1326,9 @@ a function to "munge" text, or randomize the order of all the characters
 in each word of a sentence except for the first and last characters::
 
    >>> def repl(m):
-   ...   inner_word = list(m.group(2))
-   ...   random.shuffle(inner_word)
-   ...   return m.group(1) + "".join(inner_word) + m.group(3)
+   ...     inner_word = list(m.group(2))
+   ...     random.shuffle(inner_word)
+   ...     return m.group(1) + "".join(inner_word) + m.group(3)
    >>> text = "Professor Abdolmalek, please report your absences promptly."
    >>> re.sub(r"(\w)(\w+)(\w)", repl, text)
    'Poefsrosr Aealmlobdk, pslaee reorpt your abnseces plmrptoy.'
@@ -1405,14 +1408,14 @@ successive matches::
     def tokenize(code):
         keywords = {'IF', 'THEN', 'ENDIF', 'FOR', 'NEXT', 'GOSUB', 'RETURN'}
         token_specification = [
-            ('NUMBER',  r'\d+(\.\d*)?'), # Integer or decimal number
-            ('ASSIGN',  r':='),          # Assignment operator
-            ('END',     r';'),           # Statement terminator
-            ('ID',      r'[A-Za-z]+'),   # Identifiers
-            ('OP',      r'[+\-*/]'),     # Arithmetic operators
-            ('NEWLINE', r'\n'),          # Line endings
-            ('SKIP',    r'[ \t]+'),      # Skip over spaces and tabs
-            ('MISMATCH',r'.'),           # Any other character
+            ('NUMBER',  r'\d+(\.\d*)?'),  # Integer or decimal number
+            ('ASSIGN',  r':='),           # Assignment operator
+            ('END',     r';'),            # Statement terminator
+            ('ID',      r'[A-Za-z]+'),    # Identifiers
+            ('OP',      r'[+\-*/]'),      # Arithmetic operators
+            ('NEWLINE', r'\n'),           # Line endings
+            ('SKIP',    r'[ \t]+'),       # Skip over spaces and tabs
+            ('MISMATCH',r'.'),            # Any other character
         ]
         tok_regex = '|'.join('(?P<%s>%s)' % pair for pair in token_specification)
         line_num = 1

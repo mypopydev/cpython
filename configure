@@ -673,6 +673,7 @@ LLVM_PROF_FILE
 LLVM_PROF_MERGER
 PGO_PROF_USE_FLAG
 PGO_PROF_GEN_FLAG
+LTOFLAGS
 ABIFLAGS
 LN
 MKDIR_P
@@ -703,6 +704,7 @@ LIBRARY
 BUILDEXEEXT
 EGREP
 NO_AS_NEEDED
+MULTIARCH_CPPFLAGS
 PLATFORM_TRIPLET
 PLATDIR
 MULTIARCH
@@ -750,6 +752,7 @@ build_os
 build_vendor
 build_cpu
 build
+cross_compiling
 HAS_HG
 HGBRANCH
 HGTAG
@@ -774,6 +777,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -807,6 +811,7 @@ with_suffix
 enable_shared
 enable_profiling
 with_pydebug
+with_lto
 with_hash_algorithm
 with_address_sanitizer
 with_libs
@@ -883,6 +888,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -1135,6 +1141,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1272,7 +1287,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1425,6 +1440,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1487,6 +1503,8 @@ Optional Packages:
                           compiler
   --with-suffix=.exe      set executable suffix
   --with-pydebug          build with Py_DEBUG defined
+  --with-lto              Enable Link Time Optimization in PGO builds.
+                          Disabled by default.
   --with-hash-algorithm=[fnv|siphash24]
                           select hash algorithm
   --with-address-sanitizer
@@ -2871,6 +2889,7 @@ fi
 ac_config_headers="$ac_config_headers pyconfig.h"
 
 
+
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
   if test -f "$ac_dir/install-sh"; then
@@ -3491,7 +3510,7 @@ fi
 #
 # SGI compilers allow the specification of the both the ABI and the
 # ISA on the command line.  Depending on the values of these switches,
-# different and often incompatable code will be generated.
+# different and often incompatible code will be generated.
 #
 # The SGI_ABI variable can be used to modify the CC and LDFLAGS and
 # thus supply support for various ABI/ISA combinations.  The MACHDEP
@@ -5326,9 +5345,16 @@ if test x$PLATFORM_TRIPLET != x && test x$MULTIARCH != x; then
     as_fn_error $? "internal configure error for the platform triplet, please file a bug report" "$LINENO" 5
   fi
 fi
-PLATDIR=plat-$MACHDEP
+if test x$PLATFORM_TRIPLET = x; then
+  PLATDIR=plat-$MACHDEP
+else
+  PLATDIR=plat-$PLATFORM_TRIPLET
+fi
 
 
+if test x$MULTIARCH != x; then
+  MULTIARCH_CPPFLAGS="-DMULTIARCH=\\\"$MULTIARCH\\\""
+fi
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for -Wl,--no-as-needed" >&5
@@ -6560,6 +6586,48 @@ $as_echo "no" >&6; }
 fi
 
 
+# Enable LTO flags
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for --with-lto" >&5
+$as_echo_n "checking for --with-lto... " >&6; }
+
+# Check whether --with-lto was given.
+if test "${with_lto+set}" = set; then :
+  withval=$with_lto;
+if test "$withval" != no
+then
+  Py_LTO='true'
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; };
+else
+  Py_LTO='false'
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; };
+fi
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+if test "$Py_LTO" = 'true' ; then
+  case $CC in
+    *clang*)
+      # Any changes made here should be reflected in the GCC+Darwin case below
+      LTOFLAGS="-flto"
+      ;;
+    *gcc*)
+      case $ac_sys_system in
+        Darwin*)
+          LTOFLAGS="-flto"
+          ;;
+        *)
+          LTOFLAGS="-flto -fuse-linker-plugin -ffat-lto-objects -flto-partition=none"
+          ;;
+      esac
+      ;;
+  esac
+fi
+
 # Enable PGO flags.
 
 
@@ -7521,7 +7589,7 @@ sys/param.h sys/select.h sys/sendfile.h sys/socket.h sys/statvfs.h \
 sys/stat.h sys/syscall.h sys/sys_domain.h sys/termio.h sys/time.h \
 sys/times.h sys/types.h sys/uio.h sys/un.h sys/utsname.h sys/wait.h pty.h \
 libutil.h sys/resource.h netpacket/packet.h sysexits.h bluetooth.h \
-bluetooth/bluetooth.h linux/tipc.h spawn.h util.h alloca.h endian.h \
+bluetooth/bluetooth.h linux/tipc.h linux/random.h spawn.h util.h alloca.h endian.h \
 sys/endian.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
@@ -7948,6 +8016,11 @@ $as_echo "$sol_lfs_bug" >&6; }
 if test "$sol_lfs_bug" = "yes"; then
   use_lfs=no
 fi
+
+# Don't use largefile support for GNU/Hurd
+case $ac_sys_system in GNU*)
+  use_lfs=no
+esac
 
 if test "$use_lfs" = "yes"; then
 # Two defines needed to enable largefile support on various platforms
@@ -12871,6 +12944,33 @@ _ACEOF
 
 fi
 
+ac_fn_c_check_member "$LINENO" "struct passwd" "pw_gecos" "ac_cv_member_struct_passwd_pw_gecos" "
+  #include <sys/types.h>
+  #include <pwd.h>
+
+"
+if test "x$ac_cv_member_struct_passwd_pw_gecos" = xyes; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_STRUCT_PASSWD_PW_GECOS 1
+_ACEOF
+
+
+fi
+ac_fn_c_check_member "$LINENO" "struct passwd" "pw_passwd" "ac_cv_member_struct_passwd_pw_passwd" "
+  #include <sys/types.h>
+  #include <pwd.h>
+
+"
+if test "x$ac_cv_member_struct_passwd_pw_passwd" = xyes; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_STRUCT_PASSWD_PW_PASSWD 1
+_ACEOF
+
+
+fi
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for time.h that defines altzone" >&5
 $as_echo_n "checking for time.h that defines altzone... " >&6; }
@@ -14181,6 +14281,85 @@ $as_echo "#define HAVE_BROKEN_SEM_GETVALUE 1" >>confdefs.h
 
 fi
 
+ac_fn_c_check_decl "$LINENO" "RTLD_LAZY" "ac_cv_have_decl_RTLD_LAZY" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_LAZY" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_LAZY $ac_have_decl
+_ACEOF
+ac_fn_c_check_decl "$LINENO" "RTLD_NOW" "ac_cv_have_decl_RTLD_NOW" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_NOW" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_NOW $ac_have_decl
+_ACEOF
+ac_fn_c_check_decl "$LINENO" "RTLD_GLOBAL" "ac_cv_have_decl_RTLD_GLOBAL" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_GLOBAL" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_GLOBAL $ac_have_decl
+_ACEOF
+ac_fn_c_check_decl "$LINENO" "RTLD_LOCAL" "ac_cv_have_decl_RTLD_LOCAL" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_LOCAL" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_LOCAL $ac_have_decl
+_ACEOF
+ac_fn_c_check_decl "$LINENO" "RTLD_NODELETE" "ac_cv_have_decl_RTLD_NODELETE" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_NODELETE" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_NODELETE $ac_have_decl
+_ACEOF
+ac_fn_c_check_decl "$LINENO" "RTLD_NOLOAD" "ac_cv_have_decl_RTLD_NOLOAD" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_NOLOAD" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_NOLOAD $ac_have_decl
+_ACEOF
+ac_fn_c_check_decl "$LINENO" "RTLD_DEEPBIND" "ac_cv_have_decl_RTLD_DEEPBIND" "#include <dlfcn.h>
+"
+if test "x$ac_cv_have_decl_RTLD_DEEPBIND" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_RTLD_DEEPBIND $ac_have_decl
+_ACEOF
+
+
 # determine what size digit to use for Python's longs
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking digit size for Python's longs" >&5
 $as_echo_n "checking digit size for Python's longs... " >&6; }
@@ -14614,7 +14793,11 @@ LDVERSION='$(VERSION)$(ABIFLAGS)'
 $as_echo "$LDVERSION" >&6; }
 
 
-LIBPL='$(prefix)'"/lib/python${VERSION}/config-${LDVERSION}"
+if test x$PLATFORM_TRIPLET = x; then
+  LIBPL='$(prefix)'"/lib/python${VERSION}/config-${LDVERSION}"
+else
+  LIBPL='$(prefix)'"/lib/python${VERSION}/config-${LDVERSION}-${PLATFORM_TRIPLET}"
+fi
 
 
 # Check whether right shifting a negative integer extends the sign bit
@@ -16276,13 +16459,15 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 
+    #include <unistd.h>
     #include <sys/syscall.h>
+    #include <linux/random.h>
 
     int main() {
         char buffer[1];
         const size_t buflen = sizeof(buffer);
-        const int flags = 0;
-        /* ignore the result, Python checks for ENOSYS at runtime */
+        const int flags = GRND_NONBLOCK;
+        /* ignore the result, Python checks for ENOSYS and EAGAIN at runtime */
         (void)syscall(SYS_getrandom, buffer, buflen, flags);
         return 0;
     }

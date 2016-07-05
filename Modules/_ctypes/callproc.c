@@ -157,8 +157,10 @@ _ctypes_get_errobj(int **pspace)
             return NULL;
         memset(space, 0, sizeof(int) * 2);
         errobj = PyCapsule_New(space, CTYPES_CAPSULE_NAME_PYMEM, pymem_destructor);
-        if (errobj == NULL)
+        if (errobj == NULL) {
+            PyMem_Free(space);
             return NULL;
+        }
         if (-1 == PyDict_SetItem(dict, error_object_name,
                                  errobj)) {
             Py_DECREF(errobj);
@@ -380,7 +382,7 @@ static void SetException(DWORD code, EXCEPTION_RECORD *pr)
            whose operation is not allowed in the current
            machine mode. */
         PyErr_SetString(PyExc_OSError,
-                        "exception: priviledged instruction");
+                        "exception: privileged instruction");
         break;
 
     case EXCEPTION_NONCONTINUABLE_EXCEPTION:
@@ -1307,7 +1309,7 @@ static PyObject *py_dl_open(PyObject *self, PyObject *args)
     PyObject *name, *name2;
     char *name_str;
     void * handle;
-#ifdef RTLD_LOCAL
+#if HAVE_DECL_RTLD_LOCAL
     int mode = RTLD_NOW | RTLD_LOCAL;
 #else
     /* cygwin doesn't define RTLD_LOCAL */
@@ -1681,6 +1683,10 @@ POINTER(PyObject *self, PyObject *cls)
         if (result == NULL)
             return result;
         key = PyLong_FromVoidPtr(result);
+        if (key == NULL) {
+            Py_DECREF(result);
+            return NULL;
+        }
     } else if (PyType_Check(cls)) {
         typ = (PyTypeObject *)cls;
         buf = PyMem_Malloc(strlen(typ->tp_name) + 3 + 1);

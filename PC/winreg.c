@@ -549,7 +549,7 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
             if (value != Py_None && !PyLong_Check(value))
                 return FALSE;
             *retDataBuf = (BYTE *)PyMem_NEW(DWORD, 1);
-            if (*retDataBuf==NULL){
+            if (*retDataBuf == NULL){
                 PyErr_NoMemory();
                 return FALSE;
             }
@@ -561,6 +561,24 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
             else {
                 DWORD d = PyLong_AsUnsignedLong(value);
                 memcpy(*retDataBuf, &d, sizeof(DWORD));
+            }
+            break;
+        case REG_QWORD:
+          if (value != Py_None && !PyLong_Check(value))
+                return FALSE;
+            *retDataBuf = (BYTE *)PyMem_NEW(DWORD64, 1);
+            if (*retDataBuf == NULL){
+                PyErr_NoMemory();
+                return FALSE;
+            }
+            *retDataSize = sizeof(DWORD64);
+            if (value == Py_None) {
+                DWORD64 zero = 0;
+                memcpy(*retDataBuf, &zero, sizeof(DWORD64));
+            }
+            else {
+                DWORD64 d = PyLong_AsUnsignedLongLong(value);
+                memcpy(*retDataBuf, &d, sizeof(DWORD64));
             }
             break;
         case REG_SZ:
@@ -619,7 +637,7 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
                 *retDataSize = size + 2;
                 *retDataBuf = (BYTE *)PyMem_NEW(char,
                                                 *retDataSize);
-                if (*retDataBuf==NULL){
+                if (*retDataBuf == NULL){
                     PyErr_NoMemory();
                     return FALSE;
                 }
@@ -665,7 +683,7 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
                     return FALSE;
 
                 *retDataBuf = (BYTE *)PyMem_NEW(char, view.len);
-                if (*retDataBuf==NULL){
+                if (*retDataBuf == NULL){
                     PyBuffer_Release(&view);
                     PyErr_NoMemory();
                     return FALSE;
@@ -690,7 +708,13 @@ Reg2Py(BYTE *retDataBuf, DWORD retDataSize, DWORD typ)
             if (retDataSize == 0)
                 obData = PyLong_FromUnsignedLong(0);
             else
-                obData = PyLong_FromUnsignedLong(*(int *)retDataBuf);
+                obData = PyLong_FromUnsignedLong(*(DWORD *)retDataBuf);
+            break;
+        case REG_QWORD:
+            if (retDataSize == 0)
+                obData = PyLong_FromUnsignedLongLong(0);
+            else
+                obData = PyLong_FromUnsignedLongLong(*(DWORD64 *)retDataBuf);
             break;
         case REG_SZ:
         case REG_EXPAND_SZ:
@@ -792,7 +816,7 @@ winreg.ConnectRegistry -> HKEY
         The predefined key to connect to.
     /
 
-Establishes a connection to the registry on on another computer.
+Establishes a connection to the registry on another computer.
 
 The return value is the handle of the opened key.
 If the function fails, an OSError exception is raised.
@@ -801,7 +825,7 @@ If the function fails, an OSError exception is raised.
 static HKEY
 winreg_ConnectRegistry_impl(PyModuleDef *module, Py_UNICODE *computer_name,
                             HKEY key)
-/*[clinic end generated code: output=5c52f6f7ba6e7b46 input=9a056558ce318433]*/
+/*[clinic end generated code: output=5c52f6f7ba6e7b46 input=5f98a891a347e68e]*/
 {
     HKEY retKey;
     long rc;
@@ -1599,16 +1623,18 @@ winreg.SetValueEx
         An integer that specifies the type of the data, one of:
         REG_BINARY -- Binary data in any form.
         REG_DWORD -- A 32-bit number.
-        REG_DWORD_LITTLE_ENDIAN -- A 32-bit number in little-endian format.
+        REG_DWORD_LITTLE_ENDIAN -- A 32-bit number in little-endian format. Equivalent to REG_DWORD
         REG_DWORD_BIG_ENDIAN -- A 32-bit number in big-endian format.
         REG_EXPAND_SZ -- A null-terminated string that contains unexpanded
                          references to environment variables (for example,
                          %PATH%).
         REG_LINK -- A Unicode symbolic link.
-        REG_MULTI_SZ -- An sequence of null-terminated strings, terminated
+        REG_MULTI_SZ -- A sequence of null-terminated strings, terminated
                         by two null characters.  Note that Python handles
                         this termination automatically.
         REG_NONE -- No defined value type.
+        REG_QWORD -- A 64-bit number.
+        REG_QWORD_LITTLE_ENDIAN -- A 64-bit number in little-endian format. Equivalent to REG_QWORD.
         REG_RESOURCE_LIST -- A device-driver resource list.
         REG_SZ -- A null-terminated string.
     value: object
@@ -1631,7 +1657,7 @@ the configuration registry to help the registry perform efficiently.
 static PyObject *
 winreg_SetValueEx_impl(PyModuleDef *module, HKEY key, Py_UNICODE *value_name,
                        PyObject *reserved, DWORD type, PyObject *value)
-/*[clinic end generated code: output=ea092a935c361582 input=e73dec535ebeea7d]*/
+/*[clinic end generated code: output=ea092a935c361582 input=900a9e3990bfb196]*/
 {
     BYTE *data;
     DWORD len;
@@ -1918,6 +1944,8 @@ PyMODINIT_FUNC PyInit_winreg(void)
     ADD_INT(REG_DWORD);
     ADD_INT(REG_DWORD_LITTLE_ENDIAN);
     ADD_INT(REG_DWORD_BIG_ENDIAN);
+    ADD_INT(REG_QWORD);
+    ADD_INT(REG_QWORD_LITTLE_ENDIAN);
     ADD_INT(REG_LINK);
     ADD_INT(REG_MULTI_SZ);
     ADD_INT(REG_RESOURCE_LIST);

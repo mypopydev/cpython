@@ -20,10 +20,10 @@ from collections import UserDict, UserString, UserList
 from collections import ChainMap
 from collections import deque
 from collections.abc import Awaitable, Coroutine, AsyncIterator, AsyncIterable
-from collections.abc import Hashable, Iterable, Iterator, Generator
+from collections.abc import Hashable, Iterable, Iterator, Generator, Reversible
 from collections.abc import Sized, Container, Callable
 from collections.abc import Set, MutableSet
-from collections.abc import Mapping, MutableMapping, KeysView, ItemsView
+from collections.abc import Mapping, MutableMapping, KeysView, ItemsView, ValuesView
 from collections.abc import Sequence, MutableSequence
 from collections.abc import ByteString
 
@@ -689,6 +689,31 @@ class TestOneTrickPonyABCs(ABCTestCase):
         self.validate_abstract_methods(Iterable, '__iter__')
         self.validate_isinstance(Iterable, '__iter__')
 
+    def test_Reversible(self):
+        # Check some non-reversibles
+        non_samples = [None, 42, 3.14, 1j, dict(), set(), frozenset()]
+        for x in non_samples:
+            self.assertNotIsInstance(x, Reversible)
+            self.assertFalse(issubclass(type(x), Reversible), repr(type(x)))
+        # Check some reversibles
+        samples = [tuple(), list()]
+        for x in samples:
+            self.assertIsInstance(x, Reversible)
+            self.assertTrue(issubclass(type(x), Reversible), repr(type(x)))
+        # Check also Mapping, MutableMapping, and Sequence
+        self.assertTrue(issubclass(Sequence, Reversible), repr(Sequence))
+        self.assertFalse(issubclass(Mapping, Reversible), repr(Mapping))
+        self.assertFalse(issubclass(MutableMapping, Reversible), repr(MutableMapping))
+        # Check direct subclassing
+        class R(Reversible):
+            def __iter__(self):
+                return iter(list())
+            def __reversed__(self):
+                return iter(list())
+        self.assertEqual(list(reversed(R())), [])
+        self.assertFalse(issubclass(float, R))
+        self.validate_abstract_methods(Reversible, '__reversed__', '__iter__')
+
     def test_Iterator(self):
         non_samples = [None, 42, 3.14, 1j, b"", "", (), [], {}, set()]
         for x in non_samples:
@@ -842,14 +867,14 @@ class TestOneTrickPonyABCs(ABCTestCase):
         self.validate_isinstance(Callable, '__call__')
 
     def test_direct_subclassing(self):
-        for B in Hashable, Iterable, Iterator, Sized, Container, Callable:
+        for B in Hashable, Iterable, Iterator, Reversible, Sized, Container, Callable:
             class C(B):
                 pass
             self.assertTrue(issubclass(C, B))
             self.assertFalse(issubclass(int, C))
 
     def test_registration(self):
-        for B in Hashable, Iterable, Iterator, Sized, Container, Callable:
+        for B in Hashable, Iterable, Iterator, Reversible, Sized, Container, Callable:
             class C:
                 __hash__ = None  # Make sure it isn't hashable by default
             self.assertFalse(issubclass(C, B), B.__name__)
@@ -1048,6 +1073,26 @@ class TestCollectionABCs(ABCTestCase):
         self.assertTrue(ncs <= cs)
         self.assertFalse(ncs > cs)
         self.assertTrue(ncs >= cs)
+
+    def test_issue26915(self):
+        # Container membership test should check identity first
+        class CustomEqualObject:
+            def __eq__(self, other):
+                return False
+        class CustomSequence(list):
+            def __contains__(self, value):
+                return Sequence.__contains__(self, value)
+
+        nan = float('nan')
+        obj = CustomEqualObject()
+        containers = [
+            CustomSequence([nan, obj]),
+            ItemsView({1: nan, 2: obj}),
+            ValuesView({1: nan, 2: obj})
+        ]
+        for container in containers:
+            for elem in container:
+                self.assertIn(elem, container)
 
     def assertSameSet(self, s1, s2):
         # coerce both to a real set then check equality

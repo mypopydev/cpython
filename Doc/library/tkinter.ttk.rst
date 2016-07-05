@@ -3,10 +3,14 @@
 
 .. module:: tkinter.ttk
    :synopsis: Tk themed widget set
+
 .. sectionauthor:: Guilherme Polo <ggpolo@gmail.com>
 
+**Source code:** :source:`Lib/tkinter/ttk.py`
 
 .. index:: single: ttk
+
+--------------
 
 The :mod:`tkinter.ttk` module provides access to the Tk themed widget set,
 introduced in Tk 8.5. If Python has not been compiled against Tk 8.5, this
@@ -22,7 +26,7 @@ appearance.
 
 .. seealso::
 
-   `Tk Widget Styling Support <http://www.tcl.tk/cgi-bin/tct/tip/48>`_
+   `Tk Widget Styling Support <https://www.tcl.tk/cgi-bin/tct/tip/48>`_
       A document introducing theming support for Tk
 
 
@@ -701,7 +705,7 @@ the widget option ``displaycolumns``. The tree widget can also display column
 headings. Columns may be accessed by number or symbolic names listed in the
 widget option columns. See `Column Identifiers`_.
 
-Each item is identified by an unique name. The widget will generate item IDs
+Each item is identified by a unique name. The widget will generate item IDs
 if they are not supplied by the caller. There is a distinguished root item,
 named ``{}``. The root item itself is not displayed; its children appear at the
 top level of the hierarchy.

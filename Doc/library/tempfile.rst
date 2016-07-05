@@ -1,18 +1,16 @@
 :mod:`tempfile` --- Generate temporary files and directories
 ============================================================
 
-.. sectionauthor:: Zack Weinberg <zack@codesourcery.com>
-
-
 .. module:: tempfile
    :synopsis: Generate temporary files and directories.
 
+.. sectionauthor:: Zack Weinberg <zack@codesourcery.com>
+
+**Source code:** :source:`Lib/tempfile.py`
 
 .. index::
    pair: temporary; file name
    pair: temporary; file
-
-**Source code:** :source:`Lib/tempfile.py`
 
 --------------
 
@@ -256,7 +254,7 @@ to specify the directory and this is the recommend approach.
    module.
 
    If ``tempdir`` is unset or ``None`` at any call to any of the above
-   functions except :func:`gettempprefix` it is initalized following the
+   functions except :func:`gettempprefix` it is initialized following the
    algorithm described in :func:`gettempdir`.
 
 .. _tempfile-examples:

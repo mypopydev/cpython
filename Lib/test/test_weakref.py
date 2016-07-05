@@ -133,6 +133,10 @@ class ReferencesTestCase(TestBase):
         ref1 = weakref.ref(c, callback)
         del c
 
+    def test_constructor_kwargs(self):
+        c = C()
+        self.assertRaises(TypeError, weakref.ref, c, callback=None)
+
     def test_proxy_ref(self):
         o = C()
         o.bar = 1
@@ -585,6 +589,7 @@ class ReferencesTestCase(TestBase):
         del c1, c2, C, D
         gc.collect()
 
+    @support.requires_type_collecting
     def test_callback_in_cycle_resurrection(self):
         import gc
 

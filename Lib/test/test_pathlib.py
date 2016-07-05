@@ -190,17 +190,22 @@ class _BasePurePathTest(object):
         P = self.cls
         p = P('a')
         self.assertIsInstance(p, P)
+        class PathLike:
+            def __fspath__(self):
+                return "a/b/c"
         P('a', 'b', 'c')
         P('/a', 'b', 'c')
         P('a/b/c')
         P('/a/b/c')
+        P(PathLike())
         self.assertEqual(P(P('a')), P('a'))
         self.assertEqual(P(P('a'), 'b'), P('a/b'))
         self.assertEqual(P(P('a'), P('b')), P('a/b'))
+        self.assertEqual(P(P('a'), P('b'), P('c')), P(PathLike()))
 
     def _check_str_subclass(self, *args):
         # Issue #21127: it should be possible to construct a PurePath object
-        # from an str subclass instance, and it then gets converted to
+        # from a str subclass instance, and it then gets converted to
         # a pure str object.
         class StrSubclass(str):
             pass
@@ -384,6 +389,12 @@ class _BasePurePathTest(object):
         parts = p.parts
         self.assertEqual(parts, (sep, 'a', 'b'))
 
+    def test_fspath_common(self):
+        P = self.cls
+        p = P('a/b')
+        self._check_str(p.__fspath__(), ('a/b',))
+        self._check_str(os.fspath(p), ('a/b',))
+
     def test_equivalences(self):
         for k, tuples in self.equivalences.items():
             canon = k.replace('/', self.sep)
@@ -476,22 +487,6 @@ class _BasePurePathTest(object):
         self.assertEqual(P('/a/b/.').name, 'b')
         self.assertEqual(P('a/b.py').name, 'b.py')
         self.assertEqual(P('/a/b.py').name, 'b.py')
-
-    def test_path_common(self):
-        P = self.cls
-        def check(arg, expected=None):
-            if expected is None:
-                expected = arg
-            self.assertEqual(P(arg).path, expected.replace('/', self.sep))
-        check('', '.')
-        check('.')
-        check('/')
-        check('a/b')
-        check('/a/b')
-        check('/a/b/', '/a/b')
-        check('/a/b/.', '/a/b')
-        check('a/b.py')
-        check('/a/b.py')
 
     def test_suffix_common(self):
         P = self.cls
@@ -914,17 +909,6 @@ class PureWindowsPathTest(_BasePurePathTest, unittest.TestCase):
         self.assertEqual(P('c:/a/b.py').name, 'b.py')
         self.assertEqual(P('//My.py/Share.php').name, '')
         self.assertEqual(P('//My.py/Share.php/a/b').name, 'b')
-
-    def test_path(self):
-        P = self.cls
-        self.assertEqual(P('c:').path, 'c:')
-        self.assertEqual(P('c:/').path, 'c:\\')
-        self.assertEqual(P('c:a/b').path, 'c:a\\b')
-        self.assertEqual(P('c:/a/b').path, 'c:\\a\\b')
-        self.assertEqual(P('c:a/b.py').path, 'c:a\\b.py')
-        self.assertEqual(P('c:/a/b.py').path, 'c:\\a\\b.py')
-        self.assertEqual(P('//My.py/Share.php').path, '\\\\My.py\\Share.php\\')
-        self.assertEqual(P('//My.py/Share.php/a/b').path, '\\\\My.py\\Share.php\\a\\b')
 
     def test_suffix(self):
         P = self.cls
@@ -2062,7 +2046,7 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
         import pwd
         pwdent = pwd.getpwuid(os.getuid())
         username = pwdent.pw_name
-        userhome = pwdent.pw_dir.rstrip('/')
+        userhome = pwdent.pw_dir.rstrip('/') or '/'
         # find arbitrary different user (if exists)
         for pwdent in pwd.getpwall():
             othername = pwdent.pw_name

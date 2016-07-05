@@ -128,20 +128,40 @@ static PyModuleDef readlinemodule;
 #define readlinestate_global ((readlinestate *)PyModule_GetState(PyState_FindModule(&readlinemodule)))
 
 
+/* Convert to/from multibyte C strings */
+
+static PyObject *
+encode(PyObject *b)
+{
+    return PyUnicode_EncodeLocale(b, "surrogateescape");
+}
+
+static PyObject *
+decode(const char *s)
+{
+    return PyUnicode_DecodeLocale(s, "surrogateescape");
+}
+
+
 /* Exported function to send one line to readline's init file parser */
 
 static PyObject *
-parse_and_bind(PyObject *self, PyObject *args)
+parse_and_bind(PyObject *self, PyObject *string)
 {
-    char *s, *copy;
-    if (!PyArg_ParseTuple(args, "s:parse_and_bind", &s))
+    char *copy;
+    PyObject *encoded = encode(string);
+    if (encoded == NULL) {
         return NULL;
+    }
     /* Make a copy -- rl_parse_and_bind() modifies its argument */
     /* Bernard Herzog */
-    copy = PyMem_Malloc(1 + strlen(s));
-    if (copy == NULL)
+    copy = PyMem_Malloc(1 + PyBytes_GET_SIZE(encoded));
+    if (copy == NULL) {
+        Py_DECREF(encoded);
         return PyErr_NoMemory();
-    strcpy(copy, s);
+    }
+    strcpy(copy, PyBytes_AS_STRING(encoded));
+    Py_DECREF(encoded);
     rl_parse_and_bind(copy);
     PyMem_Free(copy); /* Free the copy */
     Py_RETURN_NONE;
@@ -149,7 +169,7 @@ parse_and_bind(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(doc_parse_and_bind,
 "parse_and_bind(string) -> None\n\
-Parse and execute single line of a readline init file.");
+Execute the init line provided in the string argument.");
 
 
 /* Exported function to parse a readline init file */
@@ -174,7 +194,7 @@ read_init_file(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(doc_read_init_file,
 "read_init_file([filename]) -> None\n\
-Parse a readline initialization file.\n\
+Execute a readline initialization file.\n\
 The default filename is the last filename used.");
 
 
@@ -271,7 +291,7 @@ append_history_file(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(doc_append_history_file,
 "append_history_file(nelements[, filename]) -> None\n\
-Append the last nelements of the history list to file.\n\
+Append the last nelements items of the history list to file.\n\
 The default filename is ~/.history.");
 #endif
 
@@ -290,7 +310,7 @@ set_history_length(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(set_history_length_doc,
 "set_history_length(length) -> None\n\
-set the maximal number of items which will be written to\n\
+set the maximal number of lines which will be written to\n\
 the history file. A negative length is used to inhibit\n\
 history truncation.");
 
@@ -305,7 +325,7 @@ get_history_length(PyObject *self, PyObject *noarg)
 
 PyDoc_STRVAR(get_history_length_doc,
 "get_history_length() -> int\n\
-return the maximum number of items that will be written to\n\
+return the maximum number of lines that will be written to\n\
 the history file.");
 
 
@@ -324,7 +344,7 @@ set_hook(const char *funcname, PyObject **hook_var, PyObject *args)
     }
     else if (PyCallable_Check(function)) {
         Py_INCREF(function);
-        Py_SETREF(*hook_var, function);
+        Py_XSETREF(*hook_var, function);
     }
     else {
         PyErr_Format(PyExc_TypeError,
@@ -371,7 +391,7 @@ set_startup_hook(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(doc_set_startup_hook,
 "set_startup_hook([function]) -> None\n\
-Set or remove the startup_hook function.\n\
+Set or remove the function invoked by the rl_startup_hook callback.\n\
 The function is called with no arguments just\n\
 before readline prints the first prompt.");
 
@@ -388,7 +408,7 @@ set_pre_input_hook(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(doc_set_pre_input_hook,
 "set_pre_input_hook([function]) -> None\n\
-Set or remove the pre_input_hook function.\n\
+Set or remove the function invoked by the rl_pre_input_hook callback.\n\
 The function is called with no arguments after the first prompt\n\
 has been printed and just before readline starts reading input\n\
 characters.");
@@ -419,7 +439,7 @@ get_begidx(PyObject *self, PyObject *noarg)
 
 PyDoc_STRVAR(doc_get_begidx,
 "get_begidx() -> int\n\
-get the beginning index of the readline tab-completion scope");
+get the beginning index of the completion scope");
 
 
 /* Get the ending index for the scope of the tab-completion */
@@ -433,23 +453,24 @@ get_endidx(PyObject *self, PyObject *noarg)
 
 PyDoc_STRVAR(doc_get_endidx,
 "get_endidx() -> int\n\
-get the ending index of the readline tab-completion scope");
+get the ending index of the completion scope");
 
 
 /* Set the tab-completion word-delimiters that readline uses */
 
 static PyObject *
-set_completer_delims(PyObject *self, PyObject *args)
+set_completer_delims(PyObject *self, PyObject *string)
 {
     char *break_chars;
-
-    if (!PyArg_ParseTuple(args, "s:set_completer_delims", &break_chars)) {
+    PyObject *encoded = encode(string);
+    if (encoded == NULL) {
         return NULL;
     }
     /* Keep a reference to the allocated memory in the module state in case
        some other module modifies rl_completer_word_break_characters
        (see issue #17289). */
-    break_chars = strdup(break_chars);
+    break_chars = strdup(PyBytes_AS_STRING(encoded));
+    Py_DECREF(encoded);
     if (break_chars) {
         free(completer_word_break_characters);
         completer_word_break_characters = break_chars;
@@ -462,7 +483,7 @@ set_completer_delims(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(doc_set_completer_delims,
 "set_completer_delims(string) -> None\n\
-set the readline word delimiters for tab-completion");
+set the word delimiters for completion");
 
 /* _py_free_history_entry: Utility function to free a history entry. */
 
@@ -502,7 +523,7 @@ py_remove_history(PyObject *self, PyObject *args)
     int entry_number;
     HIST_ENTRY *entry;
 
-    if (!PyArg_ParseTuple(args, "i:remove_history", &entry_number))
+    if (!PyArg_ParseTuple(args, "i:remove_history_item", &entry_number))
         return NULL;
     if (entry_number < 0) {
         PyErr_SetString(PyExc_ValueError,
@@ -529,10 +550,11 @@ static PyObject *
 py_replace_history(PyObject *self, PyObject *args)
 {
     int entry_number;
-    char *line;
+    PyObject *line;
+    PyObject *encoded;
     HIST_ENTRY *old_entry;
 
-    if (!PyArg_ParseTuple(args, "is:replace_history", &entry_number,
+    if (!PyArg_ParseTuple(args, "iU:replace_history_item", &entry_number,
                           &line)) {
         return NULL;
     }
@@ -541,7 +563,12 @@ py_replace_history(PyObject *self, PyObject *args)
                         "History index cannot be negative");
         return NULL;
     }
-    old_entry = replace_history_entry(entry_number, line, (void *)NULL);
+    encoded = encode(line);
+    if (encoded == NULL) {
+        return NULL;
+    }
+    old_entry = replace_history_entry(entry_number, PyBytes_AS_STRING(encoded), (void *)NULL);
+    Py_DECREF(encoded);
     if (!old_entry) {
         PyErr_Format(PyExc_ValueError,
                      "No history item at position %d",
@@ -560,20 +587,38 @@ replaces history item given by its position with contents of line");
 /* Add a line to the history buffer */
 
 static PyObject *
-py_add_history(PyObject *self, PyObject *args)
+py_add_history(PyObject *self, PyObject *string)
 {
-    char *line;
-
-    if(!PyArg_ParseTuple(args, "s:add_history", &line)) {
+    PyObject *encoded = encode(string);
+    if (encoded == NULL) {
         return NULL;
     }
-    add_history(line);
+    add_history(PyBytes_AS_STRING(encoded));
+    Py_DECREF(encoded);
     Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(doc_add_history,
 "add_history(string) -> None\n\
-add a line to the history buffer");
+add an item to the history buffer");
+
+static int should_auto_add_history = 1;
+
+/* Enable or disable automatic history */
+
+static PyObject *
+py_set_auto_history(PyObject *self, PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, "p:set_auto_history",
+                          &should_auto_add_history)) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(doc_set_auto_history,
+"set_auto_history(enabled) -> None\n\
+Enables or disables automatic history.");
 
 
 /* Get the tab-completion word-delimiters that readline uses */
@@ -581,12 +626,12 @@ add a line to the history buffer");
 static PyObject *
 get_completer_delims(PyObject *self, PyObject *noarg)
 {
-    return PyUnicode_FromString(rl_completer_word_break_characters);
+    return decode(rl_completer_word_break_characters);
 }
 
 PyDoc_STRVAR(doc_get_completer_delims,
 "get_completer_delims() -> string\n\
-get the readline word delimiters for tab-completion");
+get the word delimiters for completion");
 
 
 /* Set the completer function */
@@ -647,7 +692,7 @@ get_history_item(PyObject *self, PyObject *args)
     int idx = 0;
     HIST_ENTRY *hist_ent;
 
-    if (!PyArg_ParseTuple(args, "i:index", &idx))
+    if (!PyArg_ParseTuple(args, "i:get_history_item", &idx))
         return NULL;
 #ifdef  __APPLE__
     if (using_libedit_emulation) {
@@ -671,7 +716,7 @@ get_history_item(PyObject *self, PyObject *args)
     }
 #endif /* __APPLE__ */
     if ((hist_ent = history_get(idx)))
-        return PyUnicode_FromString(hist_ent->line);
+        return decode(hist_ent->line);
     else {
         Py_RETURN_NONE;
     }
@@ -700,7 +745,7 @@ return the current (not the maximum) length of history.");
 static PyObject *
 get_line_buffer(PyObject *self, PyObject *noarg)
 {
-    return PyUnicode_FromString(rl_line_buffer);
+    return decode(rl_line_buffer);
 }
 
 PyDoc_STRVAR(doc_get_line_buffer,
@@ -728,18 +773,20 @@ Clear the current readline history.");
 /* Exported function to insert text into the line buffer */
 
 static PyObject *
-insert_text(PyObject *self, PyObject *args)
+insert_text(PyObject *self, PyObject *string)
 {
-    char *s;
-    if (!PyArg_ParseTuple(args, "s:insert_text", &s))
+    PyObject *encoded = encode(string);
+    if (encoded == NULL) {
         return NULL;
-    rl_insert_text(s);
+    }
+    rl_insert_text(PyBytes_AS_STRING(encoded));
+    Py_DECREF(encoded);
     Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(doc_insert_text,
 "insert_text(string) -> None\n\
-Insert text into the command line.");
+Insert text into the line buffer at the cursor position.");
 
 
 /* Redisplay the line buffer */
@@ -761,9 +808,9 @@ contents of the line buffer.");
 
 static struct PyMethodDef readline_methods[] =
 {
-    {"parse_and_bind", parse_and_bind, METH_VARARGS, doc_parse_and_bind},
+    {"parse_and_bind", parse_and_bind, METH_O, doc_parse_and_bind},
     {"get_line_buffer", get_line_buffer, METH_NOARGS, doc_get_line_buffer},
-    {"insert_text", insert_text, METH_VARARGS, doc_insert_text},
+    {"insert_text", insert_text, METH_O, doc_insert_text},
     {"redisplay", redisplay, METH_NOARGS, doc_redisplay},
     {"read_init_file", read_init_file, METH_VARARGS, doc_read_init_file},
     {"read_history_file", read_history_file,
@@ -790,8 +837,9 @@ static struct PyMethodDef readline_methods[] =
     {"get_endidx", get_endidx, METH_NOARGS, doc_get_endidx},
 
     {"set_completer_delims", set_completer_delims,
-     METH_VARARGS, doc_set_completer_delims},
-    {"add_history", py_add_history, METH_VARARGS, doc_add_history},
+     METH_O, doc_set_completer_delims},
+    {"set_auto_history", py_set_auto_history, METH_VARARGS, doc_set_auto_history},
+    {"add_history", py_add_history, METH_O, doc_add_history},
     {"remove_history_item", py_remove_history, METH_VARARGS, doc_remove_history},
     {"replace_history_item", py_replace_history, METH_VARARGS, doc_replace_history},
     {"get_completer_delims", get_completer_delims,
@@ -888,7 +936,7 @@ on_completion_display_matches_hook(char **matches,
                                    int num_matches, int max_length)
 {
     int i;
-    PyObject *m=NULL, *s=NULL, *r=NULL;
+    PyObject *sub, *m=NULL, *s=NULL, *r=NULL;
 #ifdef WITH_THREAD
     PyGILState_STATE gilstate = PyGILState_Ensure();
 #endif
@@ -896,16 +944,17 @@ on_completion_display_matches_hook(char **matches,
     if (m == NULL)
         goto error;
     for (i = 0; i < num_matches; i++) {
-        s = PyUnicode_FromString(matches[i+1]);
+        s = decode(matches[i+1]);
         if (s == NULL)
             goto error;
         if (PyList_SetItem(m, i, s) == -1)
             goto error;
     }
+    sub = decode(matches[0]);
     r = PyObject_CallFunction(readlinestate_global->completion_display_matches_hook,
-                              "sOi", matches[0], m, max_length);
+                              "NNi", sub, m, max_length);
 
-    Py_DECREF(m); m=NULL;
+    m=NULL;
 
     if (r == NULL ||
         (r != Py_None && PyLong_AsLong(r) == -1 && PyErr_Occurred())) {
@@ -953,22 +1002,24 @@ on_completion(const char *text, int state)
 {
     char *result = NULL;
     if (readlinestate_global->completer != NULL) {
-        PyObject *r;
+        PyObject *r = NULL, *t;
 #ifdef WITH_THREAD
         PyGILState_STATE gilstate = PyGILState_Ensure();
 #endif
         rl_attempted_completion_over = 1;
-        r = PyObject_CallFunction(readlinestate_global->completer, "si", text, state);
+        t = decode(text);
+        r = PyObject_CallFunction(readlinestate_global->completer, "Ni", t, state);
         if (r == NULL)
             goto error;
         if (r == Py_None) {
             result = NULL;
         }
         else {
-            char *s = _PyUnicode_AsString(r);
-            if (s == NULL)
+            PyObject *encoded = encode(r);
+            if (encoded == NULL)
                 goto error;
-            result = strdup(s);
+            result = strdup(PyBytes_AS_STRING(encoded));
+            Py_DECREF(encoded);
         }
         Py_DECREF(r);
         goto done;
@@ -992,6 +1043,9 @@ static char **
 flex_complete(const char *text, int start, int end)
 {
     char **result;
+    char saved;
+    size_t start_size, end_size;
+    wchar_t *s;
 #ifdef WITH_THREAD
     PyGILState_STATE gilstate = PyGILState_Ensure();
 #endif
@@ -1001,6 +1055,27 @@ flex_complete(const char *text, int start, int end)
 #ifdef HAVE_RL_COMPLETION_SUPPRESS_APPEND
     rl_completion_suppress_append = 0;
 #endif
+
+    saved = rl_line_buffer[start];
+    rl_line_buffer[start] = 0;
+    s = Py_DecodeLocale(rl_line_buffer, &start_size);
+    rl_line_buffer[start] = saved;
+    if (s == NULL) {
+        goto done;
+    }
+    PyMem_RawFree(s);
+    saved = rl_line_buffer[end];
+    rl_line_buffer[end] = 0;
+    s = Py_DecodeLocale(rl_line_buffer + start, &end_size);
+    rl_line_buffer[end] = saved;
+    if (s == NULL) {
+        goto done;
+    }
+    PyMem_RawFree(s);
+    start = (int)start_size;
+    end = start + (int)end_size;
+
+done:
     Py_XDECREF(readlinestate_global->begidx);
     Py_XDECREF(readlinestate_global->endidx);
     readlinestate_global->begidx = PyLong_FromLong((long) start);
@@ -1073,7 +1148,7 @@ setup_readline(readlinestate *mod_state)
 
 #ifndef __APPLE__
     if (!isatty(STDOUT_FILENO)) {
-        /* Issue #19884: stdout is no a terminal. Disable meta modifier
+        /* Issue #19884: stdout is not a terminal. Disable meta modifier
            keys to not write the ANSI sequence "\033[1034h" into stdout. On
            terminals supporting 8 bit characters like TERM=xterm-256color
            (which is now the default Fedora since Fedora 18), the meta key is
@@ -1266,7 +1341,7 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt)
 
     /* we have a valid line */
     n = strlen(p);
-    if (n > 0) {
+    if (should_auto_add_history && n > 0) {
         const char *line;
         int length = _py_get_history_length();
         if (length > 0)

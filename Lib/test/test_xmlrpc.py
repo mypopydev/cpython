@@ -9,7 +9,6 @@ import xmlrpc.server
 import http.client
 import http, http.server
 import socket
-import os
 import re
 import io
 import contextlib
@@ -223,6 +222,20 @@ class XMLRPCTestCase(unittest.TestCase):
             self.assertEqual(newvalue, sample)
             self.assertIs(type(newvalue), xmlrpclib.Binary)
             self.assertIsNone(m)
+
+    def test_loads_unsupported(self):
+        ResponseError = xmlrpclib.ResponseError
+        data = '<params><param><value><spam/></value></param></params>'
+        self.assertRaises(ResponseError, xmlrpclib.loads, data)
+        data = ('<params><param><value><array>'
+                '<value><spam/></value>'
+                '</array></value></param></params>')
+        self.assertRaises(ResponseError, xmlrpclib.loads, data)
+        data = ('<params><param><value><struct>'
+                '<member><name>a</name><value><spam/></value></member>'
+                '<member><name>b</name><value><spam/></value></member>'
+                '</struct></value></param></params>')
+        self.assertRaises(ResponseError, xmlrpclib.loads, data)
 
     def test_get_host_info(self):
         # see bug #3613, this raised a TypeError
@@ -762,8 +775,8 @@ class SimpleServerTestCase(BaseServerTestCase):
             #   'method "this_is_not_exists" is not supported'>}]
 
             self.assertEqual(result.results[0]['faultCode'], 1)
-            self.assertEqual(result.results[0]['faultString'],
-                '<class \'Exception\'>:method "this_is_not_exists" '
+            self.assertRegex(result.results[0]['faultString'],
+                '<class \'Exception\' at 0x.+>:method "this_is_not_exists" '
                 'is not supported')
         except (xmlrpclib.ProtocolError, OSError) as e:
             # ignore failures due to non-blocking socket 'unavailable' errors
@@ -1133,7 +1146,6 @@ def captured_stdout(encoding='utf-8'):
     """A variation on support.captured_stdout() which gives a text stream
     having a `buffer` attribute.
     """
-    import io
     orig_stdout = sys.stdout
     sys.stdout = io.TextIOWrapper(io.BytesIO(), encoding=encoding)
     try:

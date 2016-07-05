@@ -4,10 +4,8 @@ Tests of regrtest.py.
 Note: test_regrtest cannot be run twice in parallel.
 """
 
-import argparse
 import contextlib
 import faulthandler
-import getopt
 import io
 import os.path
 import platform
@@ -765,6 +763,9 @@ class ArgsTestCase(BaseTestCase):
 
         with open(filename) as fp:
             reflog = fp.read()
+            if hasattr(sys, 'getcounts'):
+                # Types are immportal if COUNT_ALLOCS is defined
+                reflog = reflog.splitlines(True)[-1]
             self.assertEqual(reflog, line2)
 
     def test_list_tests(self):

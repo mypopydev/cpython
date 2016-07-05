@@ -3022,8 +3022,14 @@ long_add(PyLongObject *a, PyLongObject *b)
     if (Py_SIZE(a) < 0) {
         if (Py_SIZE(b) < 0) {
             z = x_add(a, b);
-            if (z != NULL && Py_SIZE(z) != 0)
+            if (z != NULL) {
+                /* x_add received at least one multiple-digit int,
+                   and thus z must be a multiple-digit int.
+                   That also means z is not an element of
+                   small_ints, so negating it in-place is safe. */
+                assert(Py_REFCNT(z) == 1);
                 Py_SIZE(z) = -(Py_SIZE(z));
+            }
         }
         else
             z = x_sub(b, a);
@@ -3054,8 +3060,10 @@ long_sub(PyLongObject *a, PyLongObject *b)
             z = x_sub(a, b);
         else
             z = x_add(a, b);
-        if (z != NULL && Py_SIZE(z) != 0)
+        if (z != NULL) {
+            assert(Py_SIZE(z) == 0 || Py_REFCNT(z) == 1);
             Py_SIZE(z) = -(Py_SIZE(z));
+        }
     }
     else {
         if (Py_SIZE(b) < 0)
@@ -5199,27 +5207,9 @@ long_from_bytes(PyTypeObject *type, PyObject *args, PyObject *kwds)
         little_endian, is_signed);
     Py_DECREF(bytes);
 
-    /* If from_bytes() was used on subclass, allocate new subclass
-     * instance, initialize it with decoded int value and return it.
-     */
-    if (type != &PyLong_Type && PyType_IsSubtype(type, &PyLong_Type)) {
-        PyLongObject *newobj;
-        int i;
-        Py_ssize_t n = Py_ABS(Py_SIZE(long_obj));
-
-        newobj = (PyLongObject *)type->tp_alloc(type, n);
-        if (newobj == NULL) {
-            Py_DECREF(long_obj);
-            return NULL;
-        }
-        assert(PyLong_Check(newobj));
-        Py_SIZE(newobj) = Py_SIZE(long_obj);
-        for (i = 0; i < n; i++) {
-            newobj->ob_digit[i] =
-                ((PyLongObject *)long_obj)->ob_digit[i];
-        }
-        Py_DECREF(long_obj);
-        return (PyObject *)newobj;
+    if (type != &PyLong_Type) {
+        Py_SETREF(long_obj, PyObject_CallFunctionObjArgs((PyObject *)type,
+                                                         long_obj, NULL));
     }
 
     return long_obj;

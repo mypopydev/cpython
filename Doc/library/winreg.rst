@@ -4,8 +4,10 @@
 .. module:: winreg
    :platform: Windows
    :synopsis: Routines and objects for manipulating the Windows registry.
+
 .. sectionauthor:: Mark Hammond <MarkH@ActiveState.com>
 
+--------------
 
 These functions expose the Windows registry API to Python.  Instead of using an
 integer as the registry handle, a :ref:`handle object <handle-object>` is used
@@ -633,7 +635,7 @@ For more information, see `Registry Value Types
 
 .. data:: REG_DWORD_LITTLE_ENDIAN
 
-   A 32-bit number in little-endian format.
+   A 32-bit number in little-endian format. Equivalent to :const:`REG_DWORD`.
 
 .. data:: REG_DWORD_BIG_ENDIAN
 
@@ -656,6 +658,18 @@ For more information, see `Registry Value Types
 .. data:: REG_NONE
 
    No defined value type.
+
+.. data:: REG_QWORD
+
+   A 64-bit number.
+
+   .. versionadded:: 3.6
+
+.. data:: REG_QWORD_LITTLE_ENDIAN
+
+   A 64-bit number in little-endian format. Equivalent to :const:`REG_QWORD`.
+
+   .. versionadded:: 3.6
 
 .. data:: REG_RESOURCE_LIST
 

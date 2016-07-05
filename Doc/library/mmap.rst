@@ -4,6 +4,7 @@
 .. module:: mmap
    :synopsis: Interface to memory-mapped files for Unix and Windows.
 
+--------------
 
 Memory-mapped file objects behave like both :class:`bytearray` and like
 :term:`file objects <file object>`.  You can use mmap objects in most places
@@ -127,7 +128,7 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
       import mmap
 
       with mmap.mmap(-1, 13) as mm:
-          mm.write("Hello world!")
+          mm.write(b"Hello world!")
 
    .. versionadded:: 3.2
       Context manager support.
@@ -144,7 +145,7 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
 
       pid = os.fork()
 
-      if pid == 0: # In a child process
+      if pid == 0:  # In a child process
           mm.seek(0)
           print(mm.readline())
 

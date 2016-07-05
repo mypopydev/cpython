@@ -59,7 +59,7 @@ because bar.pth comes alphabetically before foo.pth; and spam is
 omitted because it is not mentioned in either path configuration file.
 
 The readline module is also automatically configured to enable
-completion for systems that support it.  This can be overriden in
+completion for systems that support it.  This can be overridden in
 sitecustomize, usercustomize or PYTHONSTARTUP.
 
 After these operations, an attempt is made to import a module
@@ -131,13 +131,13 @@ def removeduppaths():
 
 
 def _init_pathinfo():
-    """Return a set containing all existing directory entries from sys.path"""
+    """Return a set containing all existing file system items from sys.path."""
     d = set()
-    for dir in sys.path:
+    for item in sys.path:
         try:
-            if os.path.isdir(dir):
-                dir, dircase = makepath(dir)
-                d.add(dircase)
+            if os.path.exists(item):
+                _, itemcase = makepath(item)
+                d.add(itemcase)
         except TypeError:
             continue
     return d
@@ -150,9 +150,9 @@ def addpackage(sitedir, name, known_paths):
     """
     if known_paths is None:
         known_paths = _init_pathinfo()
-        reset = 1
+        reset = True
     else:
-        reset = 0
+        reset = False
     fullname = os.path.join(sitedir, name)
     try:
         f = open(fullname, "r")
@@ -190,9 +190,9 @@ def addsitedir(sitedir, known_paths=None):
     'sitedir'"""
     if known_paths is None:
         known_paths = _init_pathinfo()
-        reset = 1
+        reset = True
     else:
-        reset = 0
+        reset = False
     sitedir, sitedircase = makepath(sitedir)
     if not sitedircase in known_paths:
         sys.path.append(sitedir)        # Add path component
@@ -379,7 +379,7 @@ def enablerlcompleter():
 
     If the readline module can be imported, the hook will set the Tab key
     as completion key and register ~/.python_history as history file.
-    This can be overriden in the sitecustomize or usercustomize module,
+    This can be overridden in the sitecustomize or usercustomize module,
     or in a PYTHONSTARTUP file.
     """
     def register_readline():

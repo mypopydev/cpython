@@ -163,7 +163,11 @@ if_indextoname(index) -- return the corresponding interface name\n\
 # include <sys/uio.h>
 #endif
 
-#ifndef WITH_THREAD
+#if !defined(WITH_THREAD)
+# undef HAVE_GETHOSTBYNAME_R
+#endif
+
+#if defined(__ANDROID__) && __ANDROID_API__ < 23
 # undef HAVE_GETHOSTBYNAME_R
 #endif
 
@@ -1401,7 +1405,7 @@ static int
 idna_converter(PyObject *obj, struct maybe_idna *data)
 {
     size_t len;
-    PyObject *obj2, *obj3;
+    PyObject *obj2;
     if (obj == NULL) {
         idna_cleanup(data);
         return 1;
@@ -1416,31 +1420,27 @@ idna_converter(PyObject *obj, struct maybe_idna *data)
         data->buf = PyByteArray_AsString(obj);
         len = PyByteArray_Size(obj);
     }
-    else if (PyUnicode_Check(obj) && PyUnicode_READY(obj) == 0 && PyUnicode_IS_COMPACT_ASCII(obj)) {
-        data->buf = PyUnicode_DATA(obj);
-        len = PyUnicode_GET_LENGTH(obj);
+    else if (PyUnicode_Check(obj)) {
+        if (PyUnicode_READY(obj) == 0 && PyUnicode_IS_COMPACT_ASCII(obj)) {
+            data->buf = PyUnicode_DATA(obj);
+            len = PyUnicode_GET_LENGTH(obj);
+        }
+        else {
+            obj2 = PyUnicode_AsEncodedString(obj, "idna", NULL);
+            if (!obj2) {
+                PyErr_SetString(PyExc_TypeError, "encoding of hostname failed");
+                return 0;
+            }
+            assert(PyBytes_Check(obj2));
+            data->obj = obj2;
+            data->buf = PyBytes_AS_STRING(obj2);
+            len = PyBytes_GET_SIZE(obj2);
+        }
     }
     else {
-        obj2 = PyUnicode_FromObject(obj);
-        if (!obj2) {
-            PyErr_Format(PyExc_TypeError, "string or unicode text buffer expected, not %s",
-                         obj->ob_type->tp_name);
-            return 0;
-        }
-        obj3 = PyUnicode_AsEncodedString(obj2, "idna", NULL);
-        Py_DECREF(obj2);
-        if (!obj3) {
-            PyErr_SetString(PyExc_TypeError, "encoding of hostname failed");
-            return 0;
-        }
-        if (!PyBytes_Check(obj3)) {
-            Py_DECREF(obj3);
-            PyErr_SetString(PyExc_TypeError, "encoding of hostname failed to return bytes");
-            return 0;
-        }
-        data->obj = obj3;
-        data->buf = PyBytes_AS_STRING(obj3);
-        len = PyBytes_GET_SIZE(obj3);
+        PyErr_Format(PyExc_TypeError, "str, bytes or bytearray expected, not %s",
+                     obj->ob_type->tp_name);
+        return 0;
     }
     if (strlen(data->buf) != len) {
         Py_CLEAR(data->obj);
@@ -2576,6 +2576,7 @@ static PyObject *
 sock_close(PySocketSockObject *s)
 {
     SOCKET_T fd;
+    int res;
 
     fd = s->sock_fd;
     if (fd != -1) {
@@ -2586,8 +2587,11 @@ sock_close(PySocketSockObject *s)
            http://linux.derkeiler.com/Mailing-Lists/Kernel/2005-09/3000.html
            for more details. */
         Py_BEGIN_ALLOW_THREADS
-        (void) SOCKETCLOSE(fd);
+        res = SOCKETCLOSE(fd);
         Py_END_ALLOW_THREADS
+        if (res < 0) {
+            return s->errorhandler();
+        }
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -4049,6 +4053,17 @@ sock_ioctl(PySocketSockObject *s, PyObject *arg)
             return set_error();
         }
         return PyLong_FromUnsignedLong(recv); }
+#if defined(SIO_LOOPBACK_FAST_PATH)
+    case SIO_LOOPBACK_FAST_PATH: {
+        unsigned int option;
+        if (!PyArg_ParseTuple(arg, "kI:ioctl", &cmd, &option))
+            return NULL;
+        if (WSAIoctl(s->sock_fd, cmd, &option, sizeof(option),
+                         NULL, 0, &recv, NULL, NULL) == SOCKET_ERROR) {
+            return set_error();
+        }
+        return PyLong_FromUnsignedLong(recv); }
+#endif
     default:
         PyErr_Format(PyExc_ValueError, "invalid ioctl command %d", cmd);
         return NULL;
@@ -4059,7 +4074,8 @@ PyDoc_STRVAR(sock_ioctl_doc,
 \n\
 Control the socket with WSAIoctl syscall. Currently supported 'cmd' values are\n\
 SIO_RCVALL:  'option' must be one of the socket.RCVALL_* constants.\n\
-SIO_KEEPALIVE_VALS:  'option' is a tuple of (onoff, timeout, interval).");
+SIO_KEEPALIVE_VALS:  'option' is a tuple of (onoff, timeout, interval).\n\
+SIO_LOOPBACK_FAST_PATH: 'option' is a boolean value, and is disabled by default");
 #endif
 
 #if defined(MS_WINDOWS)
@@ -6231,9 +6247,6 @@ PyInit__socket(void)
     PyModule_AddIntMacro(m, AF_UNSPEC);
 #endif
     PyModule_AddIntMacro(m, AF_INET);
-#ifdef AF_INET6
-    PyModule_AddIntMacro(m, AF_INET6);
-#endif /* AF_INET6 */
 #if defined(AF_UNIX)
     PyModule_AddIntMacro(m, AF_UNIX);
 #endif /* AF_UNIX */
@@ -6525,8 +6538,10 @@ PyInit__socket(void)
 #ifdef  SO_OOBINLINE
     PyModule_AddIntMacro(m, SO_OOBINLINE);
 #endif
+#ifndef __GNU__
 #ifdef  SO_REUSEPORT
     PyModule_AddIntMacro(m, SO_REUSEPORT);
+#endif
 #endif
 #ifdef  SO_SNDBUF
     PyModule_AddIntMacro(m, SO_SNDBUF);
@@ -7268,8 +7283,16 @@ PyInit__socket(void)
 
 #ifdef SIO_RCVALL
     {
-        DWORD codes[] = {SIO_RCVALL, SIO_KEEPALIVE_VALS};
-        const char *names[] = {"SIO_RCVALL", "SIO_KEEPALIVE_VALS"};
+        DWORD codes[] = {SIO_RCVALL, SIO_KEEPALIVE_VALS,
+#if defined(SIO_LOOPBACK_FAST_PATH)
+            SIO_LOOPBACK_FAST_PATH
+#endif
+        };
+        const char *names[] = {"SIO_RCVALL", "SIO_KEEPALIVE_VALS",
+#if defined(SIO_LOOPBACK_FAST_PATH)
+            "SIO_LOOPBACK_FAST_PATH"
+#endif
+        };
         int i;
         for(i = 0; i<Py_ARRAY_LENGTH(codes); ++i) {
             PyObject *tmp;

@@ -3,19 +3,20 @@
 
 .. module:: collections.abc
    :synopsis: Abstract base classes for containers
+
 .. moduleauthor:: Raymond Hettinger <python at rcn.com>
 .. sectionauthor:: Raymond Hettinger <python at rcn.com>
 
 .. versionadded:: 3.3
    Formerly, this module was part of the :mod:`collections` module.
 
+**Source code:** :source:`Lib/_collections_abc.py`
+
 .. testsetup:: *
 
    from collections import *
    import itertools
    __name__ = '<doctest>'
-
-**Source code:** :source:`Lib/_collections_abc.py`
 
 --------------
 
@@ -40,12 +41,13 @@ ABC                        Inherits from          Abstract Methods        Mixin 
 :class:`Hashable`                                 ``__hash__``
 :class:`Iterable`                                 ``__iter__``
 :class:`Iterator`          :class:`Iterable`      ``__next__``            ``__iter__``
+:class:`Reversible`        :class:`Iterable`      ``__reversed__``
 :class:`Generator`         :class:`Iterator`      ``send``, ``throw``     ``close``, ``__iter__``, ``__next__``
 :class:`Sized`                                    ``__len__``
 :class:`Callable`                                 ``__call__``
 
 :class:`Sequence`          :class:`Sized`,        ``__getitem__``,        ``__contains__``, ``__iter__``, ``__reversed__``,
-                           :class:`Iterable`,     ``__len__``             ``index``, and ``count``
+                           :class:`Reversible`,   ``__len__``             ``index``, and ``count``
                            :class:`Container`
 
 :class:`MutableSequence`   :class:`Sequence`      ``__getitem__``,        Inherited :class:`Sequence` methods and
@@ -106,6 +108,12 @@ ABC                        Inherits from          Abstract Methods        Mixin 
    ABC for classes that provide the :meth:`~iterator.__iter__` and
    :meth:`~iterator.__next__` methods.  See also the definition of
    :term:`iterator`.
+
+.. class:: Reversible
+
+   ABC for classes that provide the :meth:`__reversed__` method.
+
+   .. versionadded:: 3.6
 
 .. class:: Generator
 
@@ -218,19 +226,22 @@ The ABC supplies the remaining methods such as :meth:`__and__` and
 :meth:`isdisjoint`::
 
     class ListBasedSet(collections.abc.Set):
-         ''' Alternate set implementation favoring space over speed
-             and not requiring the set elements to be hashable. '''
-         def __init__(self, iterable):
-             self.elements = lst = []
-             for value in iterable:
-                 if value not in lst:
-                     lst.append(value)
-         def __iter__(self):
-             return iter(self.elements)
-         def __contains__(self, value):
-             return value in self.elements
-         def __len__(self):
-             return len(self.elements)
+        ''' Alternate set implementation favoring space over speed
+            and not requiring the set elements to be hashable. '''
+        def __init__(self, iterable):
+            self.elements = lst = []
+            for value in iterable:
+                if value not in lst:
+                    lst.append(value)
+
+        def __iter__(self):
+            return iter(self.elements)
+
+        def __contains__(self, value):
+            return value in self.elements
+
+        def __len__(self):
+            return len(self.elements)
 
     s1 = ListBasedSet('abcdef')
     s2 = ListBasedSet('defghi')
@@ -263,7 +274,7 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
 
 .. seealso::
 
-   * `OrderedSet recipe <http://code.activestate.com/recipes/576694/>`_ for an
+   * `OrderedSet recipe <https://code.activestate.com/recipes/576694/>`_ for an
      example built on :class:`MutableSet`.
 
    * For more about ABCs, see the :mod:`abc` module and :pep:`3119`.

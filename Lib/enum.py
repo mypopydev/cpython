@@ -124,7 +124,7 @@ class EnumMeta(type):
 
         # save attributes from super classes so we know if we can take
         # the shortcut of storing members in the class dict
-        base_attributes = {a for b in bases for a in b.__dict__}
+        base_attributes = {a for b in enum_class.mro() for a in b.__dict__}
 
         # Reverse value->name map for hashable values.
         enum_class._value2member_map_ = {}
@@ -211,6 +211,12 @@ class EnumMeta(type):
                 enum_class.__new_member__ = __new__
             enum_class.__new__ = Enum.__new__
         return enum_class
+
+    def __bool__(self):
+        """
+        classes/types should always be True.
+        """
+        return True
 
     def __call__(cls, value, names=None, *, module=None, qualname=None, type=None, start=1):
         """Either returns an existing member, or creates a new enum class.
@@ -544,8 +550,14 @@ class Enum(metaclass=EnumMeta):
             source = vars(source)
         else:
             source = module_globals
-        members = {name: value for name, value in source.items()
-                if filter(name)}
+        # We use an OrderedDict of sorted source keys so that the
+        # _value2member_map is populated in the same order every time
+        # for a consistent reverse mapping of number to name when there
+        # are multiple names for the same number rather than varying
+        # between runs due to hash randomization of the module dictionary.
+        members = OrderedDict((name, source[name])
+                              for name in sorted(source.keys())
+                              if filter(name))
         cls = cls(name, members, module=module)
         cls.__reduce_ex__ = _reduce_ex_by_name
         module_globals.update(cls.__members__)

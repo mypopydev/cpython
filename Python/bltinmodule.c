@@ -796,12 +796,12 @@ divmod as builtin_divmod
     y: object
     /
 
-Return the tuple ((x-x%y)/y, x%y).  Invariant: div*y + mod == x.
+Return the tuple (x//y, x%y).  Invariant: div*y + mod == x.
 [clinic start generated code]*/
 
 static PyObject *
 builtin_divmod_impl(PyModuleDef *module, PyObject *x, PyObject *y)
-/*[clinic end generated code: output=9ad0076120ebf9ac input=7fdb15f8a97a5fe7]*/
+/*[clinic end generated code: output=9ad0076120ebf9ac input=175ad9c84ff41a85]*/
 {
     return PyNumber_Divmod(x, y);
 }
@@ -1931,9 +1931,8 @@ builtin_input_impl(PyModuleDef *module, PyObject *prompt)
             Py_CLEAR(stringpo);
             if (po == NULL)
                 goto _readline_errors;
-            promptstr = PyBytes_AsString(po);
-            if (promptstr == NULL)
-                goto _readline_errors;
+            assert(PyBytes_Check(po));
+            promptstr = PyBytes_AS_STRING(po);
         }
         else {
             po = NULL;
@@ -2712,10 +2711,10 @@ _PyBuiltin_Init(void)
     SETBUILTIN("zip",                   &PyZip_Type);
     debug = PyBool_FromLong(Py_OptimizeFlag == 0);
     if (PyDict_SetItemString(dict, "__debug__", debug) < 0) {
-        Py_XDECREF(debug);
+        Py_DECREF(debug);
         return NULL;
     }
-    Py_XDECREF(debug);
+    Py_DECREF(debug);
 
     return mod;
 #undef ADD_TO_ALL

@@ -217,6 +217,33 @@ class TestPartialC(TestPartial, unittest.TestCase):
                       ['{}({!r}, {}, {})'.format(name, capture, args_repr, kwargs_repr)
                        for kwargs_repr in kwargs_reprs])
 
+    def test_recursive_repr(self):
+        if self.partial is c_functools.partial:
+            name = 'functools.partial'
+        else:
+            name = self.partial.__name__
+
+        f = self.partial(capture)
+        f.__setstate__((f, (), {}, {}))
+        try:
+            self.assertEqual(repr(f), '%s(%s(...))' % (name, name))
+        finally:
+            f.__setstate__((capture, (), {}, {}))
+
+        f = self.partial(capture)
+        f.__setstate__((capture, (f,), {}, {}))
+        try:
+            self.assertEqual(repr(f), '%s(%r, %s(...))' % (name, capture, name))
+        finally:
+            f.__setstate__((capture, (), {}, {}))
+
+        f = self.partial(capture)
+        f.__setstate__((capture, (), {'a': f}, {}))
+        try:
+            self.assertEqual(repr(f), '%s(%r, a=%s(...))' % (name, capture, name))
+        finally:
+            f.__setstate__((capture, (), {}, {}))
+
     def test_pickle(self):
         f = self.partial(signature, ['asdf'], bar=[True])
         f.attr = []
@@ -296,6 +323,40 @@ class TestPartialC(TestPartial, unittest.TestCase):
         r = f(2)
         self.assertEqual(r, ((1, 2), {}))
         self.assertIs(type(r[0]), tuple)
+
+    def test_recursive_pickle(self):
+        f = self.partial(capture)
+        f.__setstate__((f, (), {}, {}))
+        try:
+            for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+                with self.assertRaises(RecursionError):
+                    pickle.dumps(f, proto)
+        finally:
+            f.__setstate__((capture, (), {}, {}))
+
+        f = self.partial(capture)
+        f.__setstate__((capture, (f,), {}, {}))
+        try:
+            for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+                f_copy = pickle.loads(pickle.dumps(f, proto))
+                try:
+                    self.assertIs(f_copy.args[0], f_copy)
+                finally:
+                    f_copy.__setstate__((capture, (), {}, {}))
+        finally:
+            f.__setstate__((capture, (), {}, {}))
+
+        f = self.partial(capture)
+        f.__setstate__((capture, (), {'a': f}, {}))
+        try:
+            for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+                f_copy = pickle.loads(pickle.dumps(f, proto))
+                try:
+                    self.assertIs(f_copy.keywords['a'], f_copy)
+                finally:
+                    f_copy.__setstate__((capture, (), {}, {}))
+        finally:
+            f.__setstate__((capture, (), {}, {}))
 
     # Issue 6083: Reference counting bug
     def test_setstate_refcount(self):
@@ -1506,7 +1567,7 @@ class TestSingleDispatch(unittest.TestCase):
                                  object])
 
         # MutableSequence below is registered directly on D. In other words, it
-        # preceeds MutableMapping which means single dispatch will always
+        # precedes MutableMapping which means single dispatch will always
         # choose MutableSequence here.
         class D(c.defaultdict):
             pass
@@ -1516,7 +1577,7 @@ class TestSingleDispatch(unittest.TestCase):
             m = mro(D, bases)
             self.assertEqual(m, [D, c.MutableSequence, c.Sequence,
                                  c.defaultdict, dict, c.MutableMapping,
-                                 c.Mapping, c.Sized, c.Iterable, c.Container,
+                                 c.Mapping, c.Sized, c.Reversible, c.Iterable, c.Container,
                                  object])
 
         # Container and Callable are registered on different base classes and
@@ -1697,13 +1758,10 @@ class TestSingleDispatch(unittest.TestCase):
         c.Container.register(P)
         with self.assertRaises(RuntimeError) as re_one:
             g(p)
-        self.assertIn(
-            str(re_one.exception),
-            (("Ambiguous dispatch: <class 'collections.abc.Container'> "
-              "or <class 'collections.abc.Iterable'>"),
-             ("Ambiguous dispatch: <class 'collections.abc.Iterable'> "
-              "or <class 'collections.abc.Container'>")),
-        )
+        self.assertIn("Ambiguous dispatch:", str(re_one.exception))
+        self.assertIn("<class 'collections.abc.Container'", str(re_one.exception))
+        self.assertIn("<class 'collections.abc.Iterable'", str(re_one.exception))
+
         class Q(c.Sized):
             def __len__(self):
                 return 0
@@ -1729,13 +1787,10 @@ class TestSingleDispatch(unittest.TestCase):
         # perspective.
         with self.assertRaises(RuntimeError) as re_two:
             h(c.defaultdict(lambda: 0))
-        self.assertIn(
-            str(re_two.exception),
-            (("Ambiguous dispatch: <class 'collections.abc.Container'> "
-              "or <class 'collections.abc.Sized'>"),
-             ("Ambiguous dispatch: <class 'collections.abc.Sized'> "
-              "or <class 'collections.abc.Container'>")),
-        )
+        self.assertIn("Ambiguous dispatch:", str(re_two.exception))
+        self.assertIn("<class 'collections.abc.Container'", str(re_two.exception))
+        self.assertIn("<class 'collections.abc.Sized'", str(re_two.exception))
+
         class R(c.defaultdict):
             pass
         c.MutableSequence.register(R)
@@ -1769,13 +1824,10 @@ class TestSingleDispatch(unittest.TestCase):
         # There is no preference for registered versus inferred ABCs.
         with self.assertRaises(RuntimeError) as re_three:
             h(u)
-        self.assertIn(
-            str(re_three.exception),
-            (("Ambiguous dispatch: <class 'collections.abc.Container'> "
-              "or <class 'collections.abc.Sized'>"),
-             ("Ambiguous dispatch: <class 'collections.abc.Sized'> "
-              "or <class 'collections.abc.Container'>")),
-        )
+        self.assertIn("Ambiguous dispatch:", str(re_three.exception))
+        self.assertIn("<class 'collections.abc.Container'", str(re_three.exception))
+        self.assertIn("<class 'collections.abc.Sized'", str(re_three.exception))
+
         class V(c.Sized, S):
             def __len__(self):
                 return 0

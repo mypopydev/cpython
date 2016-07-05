@@ -324,7 +324,7 @@ containing test:
     >>> test.lineno + e2.lineno
     26
 
-If the docstring contains inconsistant leading whitespace in the
+If the docstring contains inconsistent leading whitespace in the
 expected output of an example, then `DocTest` will raise a ValueError:
 
     >>> docstring = r'''
@@ -1876,7 +1876,6 @@ if not hasattr(sys, 'gettrace') or not sys.gettrace():
         To demonstrate this, we'll create a fake standard input that
         captures our debugger input:
 
-          >>> import tempfile
           >>> real_stdin = sys.stdin
           >>> sys.stdin = _FakeInput([
           ...    'print(x)',  # print data defined by the example
@@ -1917,7 +1916,7 @@ if not hasattr(sys, 'gettrace') or not sys.gettrace():
           ... finally:
           ...     sys.stdin = real_stdin
           --Return--
-          > <doctest test.test_doctest.test_pdb_set_trace[8]>(3)calls_set_trace()->None
+          > <doctest test.test_doctest.test_pdb_set_trace[7]>(3)calls_set_trace()->None
           -> import pdb; pdb.set_trace()
           (Pdb) print(y)
           2
@@ -2339,7 +2338,7 @@ def test_DocFileSuite():
        `__file__` global, which is set to the name of the file
        containing the tests:
 
-         >>> suite = doctest.DocFileSuite('test_doctest3.txt')
+         >>> suite = doctest.DocFileSuite('test_doctest3.txt', optionflags=doctest.ELLIPSIS)
          >>> suite.run(unittest.TestResult())
          <unittest.result.TestResult run=1 errors=0 failures=0>
 
@@ -2719,12 +2718,6 @@ output into something we can doctest against:
     >>> def normalize(s):
     ...     return '\n'.join(s.decode().splitlines())
 
-Note: we also pass TERM='' to all the assert_python calls to avoid a bug
-in the readline library that is triggered in these tests because we are
-running them in a new python process.  See:
-
-  http://lists.gnu.org/archive/html/bug-readline/2013-06/msg00000.html
-
 With those preliminaries out of the way, we'll start with a file with two
 simple tests and no errors.  We'll run both the unadorned doctest command, and
 the verbose version, and then check the output:
@@ -2741,9 +2734,9 @@ the verbose version, and then check the output:
     ...         _ = f.write('\n')
     ...         _ = f.write('And that is it.\n')
     ...     rc1, out1, err1 = script_helper.assert_python_ok(
-    ...             '-m', 'doctest', fn, TERM='')
+    ...             '-m', 'doctest', fn)
     ...     rc2, out2, err2 = script_helper.assert_python_ok(
-    ...             '-m', 'doctest', '-v', fn, TERM='')
+    ...             '-m', 'doctest', '-v', fn)
 
 With no arguments and passing tests, we should get no output:
 
@@ -2804,19 +2797,18 @@ text files).
     ...         _ = f.write("       'abc def'\n")
     ...         _ = f.write("\n")
     ...         _ = f.write('   \"\"\"\n')
-    ...     import shutil
     ...     rc1, out1, err1 = script_helper.assert_python_failure(
-    ...             '-m', 'doctest', fn, fn2, TERM='')
+    ...             '-m', 'doctest', fn, fn2)
     ...     rc2, out2, err2 = script_helper.assert_python_ok(
-    ...             '-m', 'doctest', '-o', 'ELLIPSIS', fn, TERM='')
+    ...             '-m', 'doctest', '-o', 'ELLIPSIS', fn)
     ...     rc3, out3, err3 = script_helper.assert_python_ok(
     ...             '-m', 'doctest', '-o', 'ELLIPSIS',
-    ...             '-o', 'NORMALIZE_WHITESPACE', fn, fn2, TERM='')
+    ...             '-o', 'NORMALIZE_WHITESPACE', fn, fn2)
     ...     rc4, out4, err4 = script_helper.assert_python_failure(
-    ...             '-m', 'doctest', '-f', fn, fn2, TERM='')
+    ...             '-m', 'doctest', '-f', fn, fn2)
     ...     rc5, out5, err5 = script_helper.assert_python_ok(
     ...             '-m', 'doctest', '-v', '-o', 'ELLIPSIS',
-    ...             '-o', 'NORMALIZE_WHITESPACE', fn, fn2, TERM='')
+    ...             '-o', 'NORMALIZE_WHITESPACE', fn, fn2)
 
 Our first test run will show the errors from the first file (doctest stops if a
 file has errors).  Note that doctest test-run error output appears on stdout,
@@ -2922,7 +2914,7 @@ We should also check some typical error cases.
 Invalid file name:
 
     >>> rc, out, err = script_helper.assert_python_failure(
-    ...         '-m', 'doctest', 'nosuchfile', TERM='')
+    ...         '-m', 'doctest', 'nosuchfile')
     >>> rc, out
     (1, b'')
     >>> print(normalize(err))                    # doctest: +ELLIPSIS
@@ -2933,7 +2925,7 @@ Invalid file name:
 Invalid doctest option:
 
     >>> rc, out, err = script_helper.assert_python_failure(
-    ...         '-m', 'doctest', '-o', 'nosuchoption', TERM='')
+    ...         '-m', 'doctest', '-o', 'nosuchoption')
     >>> rc, out
     (2, b'')
     >>> print(normalize(err))                    # doctest: +ELLIPSIS

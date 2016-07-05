@@ -316,7 +316,7 @@ assign_version_tag(PyTypeObject *type)
         for (i = 0; i < (1 << MCACHE_SIZE_EXP); i++) {
             method_cache[i].value = NULL;
             Py_INCREF(Py_None);
-            Py_SETREF(method_cache[i].name, Py_None);
+            Py_XSETREF(method_cache[i].name, Py_None);
         }
         /* mark all version tags as invalid */
         PyType_Modified(&PyBaseObject_Type);
@@ -460,7 +460,7 @@ type_module(PyTypeObject *type, void *context)
             PyErr_Format(PyExc_AttributeError, "__module__");
             return 0;
         }
-        Py_XINCREF(mod);
+        Py_INCREF(mod);
         return mod;
     }
     else {
@@ -500,7 +500,7 @@ type_abstractmethods(PyTypeObject *type, void *context)
             PyErr_SetObject(PyExc_AttributeError, message);
         return NULL;
     }
-    Py_XINCREF(mod);
+    Py_INCREF(mod);
     return mod;
 }
 
@@ -859,9 +859,9 @@ type_repr(PyTypeObject *type)
     }
 
     if (mod != NULL && _PyUnicode_CompareWithId(mod, &PyId_builtins))
-        rtn = PyUnicode_FromFormat("<class '%U.%U'>", mod, name);
-    else
-        rtn = PyUnicode_FromFormat("<class '%s'>", type->tp_name);
+        rtn = PyUnicode_FromFormat("<class '%U.%U' at %p>", mod, name, type);
+    else    
+        rtn = PyUnicode_FromFormat("<class '%s' at %p>", type->tp_name, type);
 
     Py_XDECREF(mod);
     Py_DECREF(name);
@@ -1534,7 +1534,6 @@ class_name(PyObject *cls)
     PyObject *name = _PyObject_GetAttrId(cls, &PyId___name__);
     if (name == NULL) {
         PyErr_Clear();
-        Py_XDECREF(name);
         name = PyObject_Repr(cls);
     }
     if (name == NULL)
@@ -2124,7 +2123,7 @@ subtype_setdict(PyObject *obj, PyObject *value, void *context)
         return -1;
     }
     Py_XINCREF(value);
-    Py_SETREF(*dictptr, value);
+    Py_XSETREF(*dictptr, value);
     return 0;
 }
 
@@ -2581,8 +2580,10 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
         tmp = PyStaticMethod_New(tmp);
         if (tmp == NULL)
             goto error;
-        if (_PyDict_SetItemId(dict, &PyId___new__, tmp) < 0)
+        if (_PyDict_SetItemId(dict, &PyId___new__, tmp) < 0) {
+            Py_DECREF(tmp);
             goto error;
+        }
         Py_DECREF(tmp);
     }
 
@@ -3925,7 +3926,7 @@ _PyObject_GetState(PyObject *obj, int required)
                     }
                 }
 
-                /* The list is stored on the class so it may mutates while we
+                /* The list is stored on the class so it may mutate while we
                    iterate over it */
                 if (slotnames_size != Py_SIZE(slotnames)) {
                     PyErr_Format(PyExc_RuntimeError,
@@ -3944,7 +3945,7 @@ _PyObject_GetState(PyObject *obj, int required)
             }
 
             /* If we found some slot attributes, pack them in a tuple along
-               the orginal attribute dictionary. */
+               the original attribute dictionary. */
             if (PyDict_Size(slots) > 0) {
                 PyObject *state2;
 
@@ -4059,7 +4060,7 @@ _PyObject_GetNewArguments(PyObject *obj, PyObject **args, PyObject **kwargs)
     }
 
     /* The object does not have __getnewargs_ex__ and __getnewargs__. This may
-       means __new__ does not takes any arguments on this object, or that the
+       mean __new__ does not takes any arguments on this object, or that the
        object does not implement the reduce protocol for pickling or
        copying. */
     *args = NULL;
@@ -5776,8 +5777,8 @@ slot_sq_item(PyObject *self, Py_ssize_t i)
             if (args != NULL) {
                 PyTuple_SET_ITEM(args, 0, ival);
                 retval = PyObject_Call(func, args, NULL);
-                Py_XDECREF(args);
-                Py_XDECREF(func);
+                Py_DECREF(args);
+                Py_DECREF(func);
                 return retval;
             }
         }
@@ -6791,7 +6792,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
                sanity checks and constructing a new argument
                list.  Cut all that nonsense short -- this speeds
                up instance creation tremendously. */
-            specific = (void *)((PyTypeObject *)PyCFunction_GET_SELF(descr))->tp_new;
+            specific = (void *)type->tp_new;
             /* XXX I'm not 100% sure that there isn't a hole
                in this reasoning that requires additional
                sanity checks.  I'll buy the first person to
@@ -7350,9 +7351,9 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
         Py_INCREF(obj);
     }
     Py_INCREF(type);
-    su->type = type;
-    su->obj = obj;
-    su->obj_type = obj_type;
+    Py_XSETREF(su->type, type);
+    Py_XSETREF(su->obj, obj);
+    Py_XSETREF(su->obj_type, obj_type);
     return 0;
 }
 

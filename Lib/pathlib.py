@@ -634,13 +634,16 @@ class PurePath(object):
         for a in args:
             if isinstance(a, PurePath):
                 parts += a._parts
-            elif isinstance(a, str):
-                # Force-cast str subclasses to str (issue #21127)
-                parts.append(str(a))
             else:
-                raise TypeError(
-                    "argument should be a path or str object, not %r"
-                    % type(a))
+                a = os.fspath(a)
+                if isinstance(a, str):
+                    # Force-cast str subclasses to str (issue #21127)
+                    parts.append(str(a))
+                else:
+                    raise TypeError(
+                        "argument should be a str object or an os.PathLike "
+                        "object returning str, not %r"
+                        % type(a))
         return cls._flavour.parse_parts(parts)
 
     @classmethod
@@ -674,7 +677,7 @@ class PurePath(object):
             return cls._flavour.join(parts)
 
     def _init(self):
-        # Overriden in concrete Path
+        # Overridden in concrete Path
         pass
 
     def _make_child(self, args):
@@ -693,12 +696,8 @@ class PurePath(object):
                                                   self._parts) or '.'
             return self._str
 
-    @property
-    def path(self):
-        try:
-            return self._str
-        except AttributeError:
-            return str(self)
+    def __fspath__(self):
+        return str(self)
 
     def as_posix(self):
         """Return the string representation of the path with forward (/)
@@ -949,6 +948,10 @@ class PurePath(object):
             if not fnmatch.fnmatchcase(part, pat):
                 return False
         return True
+
+# Can't subclass os.PathLike from PurePath and keep the constructor
+# optimizations in PurePath._parse_args().
+os.PathLike.register(PurePath)
 
 
 class PurePosixPath(PurePath):

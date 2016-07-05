@@ -3,7 +3,7 @@ preserve
 [clinic start generated code]*/
 
 PyDoc_STRVAR(zlib_compress__doc__,
-"compress($module, /, data, level=Z_DEFAULT_COMPRESSION)\n"
+"compress($module, data, /, level=Z_DEFAULT_COMPRESSION)\n"
 "--\n"
 "\n"
 "Returns a bytes object containing compressed data.\n"
@@ -23,19 +23,21 @@ static PyObject *
 zlib_compress(PyModuleDef *module, PyObject *args, PyObject *kwargs)
 {
     PyObject *return_value = NULL;
-    static char *_keywords[] = {"data", "level", NULL};
+    static char *_keywords[] = {"", "level", NULL};
     Py_buffer data = {NULL, NULL};
     int level = Z_DEFAULT_COMPRESSION;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|i:compress", _keywords,
-        &data, &level))
+        &data, &level)) {
         goto exit;
+    }
     return_value = zlib_compress_impl(module, &data, level);
 
 exit:
     /* Cleanup for data */
-    if (data.obj)
+    if (data.obj) {
        PyBuffer_Release(&data);
+    }
 
     return return_value;
 }
@@ -49,7 +51,7 @@ PyDoc_STRVAR(zlib_decompress__doc__,
 "  data\n"
 "    Compressed data.\n"
 "  wbits\n"
-"    The window buffer size.\n"
+"    The window buffer size and container format.\n"
 "  bufsize\n"
 "    The initial output buffer size.");
 
@@ -69,14 +71,16 @@ zlib_decompress(PyModuleDef *module, PyObject *args)
     unsigned int bufsize = DEF_BUF_SIZE;
 
     if (!PyArg_ParseTuple(args, "y*|iO&:decompress",
-        &data, &wbits, capped_uint_converter, &bufsize))
+        &data, &wbits, capped_uint_converter, &bufsize)) {
         goto exit;
+    }
     return_value = zlib_decompress_impl(module, &data, wbits, bufsize);
 
 exit:
     /* Cleanup for data */
-    if (data.obj)
+    if (data.obj) {
        PyBuffer_Release(&data);
+    }
 
     return return_value;
 }
@@ -96,7 +100,10 @@ PyDoc_STRVAR(zlib_compressobj__doc__,
 "  method\n"
 "    The compression algorithm.  If given, this must be DEFLATED.\n"
 "  wbits\n"
-"    The base two logarithm of the window size (range: 8..15).\n"
+"    +9 to +15: The base-two logarithm of the window size.  Include a zlib\n"
+"        container.\n"
+"    -9 to -15: Generate a raw stream.\n"
+"    +25 to +31: Include a gzip container.\n"
 "  memLevel\n"
 "    Controls the amount of memory used for internal compression state.\n"
 "    Valid values range from 1 to 9.  Higher values result in higher memory\n"
@@ -128,14 +135,16 @@ zlib_compressobj(PyModuleDef *module, PyObject *args, PyObject *kwargs)
     Py_buffer zdict = {NULL, NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iiiiiy*:compressobj", _keywords,
-        &level, &method, &wbits, &memLevel, &strategy, &zdict))
+        &level, &method, &wbits, &memLevel, &strategy, &zdict)) {
         goto exit;
+    }
     return_value = zlib_compressobj_impl(module, level, method, wbits, memLevel, strategy, &zdict);
 
 exit:
     /* Cleanup for zdict */
-    if (zdict.obj)
+    if (zdict.obj) {
        PyBuffer_Release(&zdict);
+    }
 
     return return_value;
 }
@@ -147,7 +156,7 @@ PyDoc_STRVAR(zlib_decompressobj__doc__,
 "Return a decompressor object.\n"
 "\n"
 "  wbits\n"
-"    The window buffer size.\n"
+"    The window buffer size and container format.\n"
 "  zdict\n"
 "    The predefined compression dictionary.  This must be the same\n"
 "    dictionary as used by the compressor that produced the input data.");
@@ -167,8 +176,9 @@ zlib_decompressobj(PyModuleDef *module, PyObject *args, PyObject *kwargs)
     PyObject *zdict = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iO:decompressobj", _keywords,
-        &wbits, &zdict))
+        &wbits, &zdict)) {
         goto exit;
+    }
     return_value = zlib_decompressobj_impl(module, wbits, zdict);
 
 exit:
@@ -200,14 +210,16 @@ zlib_Compress_compress(compobject *self, PyObject *arg)
     PyObject *return_value = NULL;
     Py_buffer data = {NULL, NULL};
 
-    if (!PyArg_Parse(arg, "y*:compress", &data))
+    if (!PyArg_Parse(arg, "y*:compress", &data)) {
         goto exit;
+    }
     return_value = zlib_Compress_compress_impl(self, &data);
 
 exit:
     /* Cleanup for data */
-    if (data.obj)
+    if (data.obj) {
        PyBuffer_Release(&data);
+    }
 
     return return_value;
 }
@@ -244,14 +256,16 @@ zlib_Decompress_decompress(compobject *self, PyObject *args)
     unsigned int max_length = 0;
 
     if (!PyArg_ParseTuple(args, "y*|O&:decompress",
-        &data, capped_uint_converter, &max_length))
+        &data, capped_uint_converter, &max_length)) {
         goto exit;
+    }
     return_value = zlib_Decompress_decompress_impl(self, &data, max_length);
 
 exit:
     /* Cleanup for data */
-    if (data.obj)
+    if (data.obj) {
        PyBuffer_Release(&data);
+    }
 
     return return_value;
 }
@@ -281,8 +295,9 @@ zlib_Compress_flush(compobject *self, PyObject *args)
     int mode = Z_FINISH;
 
     if (!PyArg_ParseTuple(args, "|i:flush",
-        &mode))
+        &mode)) {
         goto exit;
+    }
     return_value = zlib_Compress_flush_impl(self, mode);
 
 exit:
@@ -355,8 +370,9 @@ zlib_Decompress_flush(compobject *self, PyObject *args)
     unsigned int length = DEF_BUF_SIZE;
 
     if (!PyArg_ParseTuple(args, "|O&:flush",
-        capped_uint_converter, &length))
+        capped_uint_converter, &length)) {
         goto exit;
+    }
     return_value = zlib_Decompress_flush_impl(self, length);
 
 exit:
@@ -388,14 +404,16 @@ zlib_adler32(PyModuleDef *module, PyObject *args)
     unsigned int value = 1;
 
     if (!PyArg_ParseTuple(args, "y*|I:adler32",
-        &data, &value))
+        &data, &value)) {
         goto exit;
+    }
     return_value = zlib_adler32_impl(module, &data, value);
 
 exit:
     /* Cleanup for data */
-    if (data.obj)
+    if (data.obj) {
        PyBuffer_Release(&data);
+    }
 
     return return_value;
 }
@@ -425,14 +443,16 @@ zlib_crc32(PyModuleDef *module, PyObject *args)
     unsigned int value = 0;
 
     if (!PyArg_ParseTuple(args, "y*|I:crc32",
-        &data, &value))
+        &data, &value)) {
         goto exit;
+    }
     return_value = zlib_crc32_impl(module, &data, value);
 
 exit:
     /* Cleanup for data */
-    if (data.obj)
+    if (data.obj) {
        PyBuffer_Release(&data);
+    }
 
     return return_value;
 }
@@ -440,4 +460,4 @@ exit:
 #ifndef ZLIB_COMPRESS_COPY_METHODDEF
     #define ZLIB_COMPRESS_COPY_METHODDEF
 #endif /* !defined(ZLIB_COMPRESS_COPY_METHODDEF) */
-/*[clinic end generated code: output=e6f3b79e051ecc35 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=ba904dec30cc1a1a input=a9049054013a1b77]*/

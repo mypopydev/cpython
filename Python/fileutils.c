@@ -176,7 +176,7 @@ check_force_ascii(void)
 #endif
 
 error:
-    /* if an error occured, force the ASCII encoding */
+    /* if an error occurred, force the ASCII encoding */
     return 1;
 }
 
@@ -798,7 +798,7 @@ set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
     int request;
     int err;
 #endif
-    int flags;
+    int flags, new_flags;
     int res;
 #endif
 
@@ -860,7 +860,7 @@ set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
             return 0;
         }
 
-        if (errno != ENOTTY) {
+        if (errno != ENOTTY && errno != EACCES) {
             if (raise)
                 PyErr_SetFromErrno(PyExc_OSError);
             return -1;
@@ -869,7 +869,12 @@ set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
             /* Issue #22258: Here, ENOTTY means "Inappropriate ioctl for
                device". The ioctl is declared but not supported by the kernel.
                Remember that ioctl() doesn't work. It is the case on
-               Illumos-based OS for example. */
+               Illumos-based OS for example.
+
+               Issue #27057: When SELinux policy disallows ioctl it will fail
+               with EACCES. While FIOCLEX is safe operation it may be
+               unavailable because ioctl was denied altogether.
+               This can be the case on Android. */
             ioctl_works = 0;
         }
         /* fallback to fcntl() if ioctl() does not work */
@@ -884,10 +889,18 @@ set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
         return -1;
     }
 
-    if (inheritable)
-        flags &= ~FD_CLOEXEC;
-    else
-        flags |= FD_CLOEXEC;
+    if (inheritable) {
+        new_flags = flags & ~FD_CLOEXEC;
+    }
+    else {
+        new_flags = flags | FD_CLOEXEC;
+    }
+
+    if (new_flags == flags) {
+        /* FD_CLOEXEC flag already set/cleared: nothing to do */
+        return 0;
+    }
+
     res = fcntl(fd, F_SETFD, flags);
     if (res < 0) {
         if (raise)

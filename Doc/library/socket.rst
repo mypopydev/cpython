@@ -4,6 +4,9 @@
 .. module:: socket
    :synopsis: Low-level networking interface.
 
+**Source code:** :source:`Lib/socket.py`
+
+--------------
 
 This module provides access to the BSD *socket* interface. It is available on
 all modern Unix systems, Windows, MacOS, and probably additional platforms.
@@ -326,11 +329,16 @@ Constants
    .. versionadded:: 3.3
 
 
-.. data:: SIO_*
+.. data:: SIO_RCVALL
+          SIO_KEEPALIVE_VALS
+          SIO_LOOPBACK_FAST_PATH
           RCVALL_*
 
    Constants for Windows' WSAIoctl(). The constants are used as arguments to the
    :meth:`~socket.socket.ioctl` method of socket objects.
+
+   .. versionchanged:: 3.6
+      ``SIO_LOOPBACK_FAST_PATH`` was added.
 
 
 .. data:: TIPC_*
@@ -444,9 +452,6 @@ The following functions all create :ref:`socket objects <socket-objects>`.
 
    .. versionchanged:: 3.2
       *source_address* was added.
-
-   .. versionchanged:: 3.2
-      support for the :keyword:`with` statement was added.
 
 
 .. function:: fromfd(fd, family, type, proto=0)
@@ -831,6 +836,10 @@ Socket objects have the following methods.  Except for
 :meth:`~socket.makefile`, these correspond to Unix system calls applicable
 to sockets.
 
+.. versionchanged:: 3.2
+   Support for the :term:`context manager` protocol was added.  Exiting the
+   context manager is equivalent to calling :meth:`~socket.close`.
+
 
 .. method:: socket.accept()
 
@@ -867,6 +876,10 @@ to sockets.
    Sockets are automatically closed when they are garbage-collected, but
    it is recommended to :meth:`close` them explicitly, or to use a
    :keyword:`with` statement around them.
+
+   .. versionchanged:: 3.6
+      :exc:`OSError` is now raised if an error occurs when the underlying
+      :c:func:`close` call is made.
 
    .. note::
 
@@ -926,13 +939,12 @@ to sockets.
 
 .. method:: socket.fileno()
 
-   Return the socket's file descriptor (a small integer).  This is useful with
-   :func:`select.select`.
+   Return the socket's file descriptor (a small integer), or -1 on failure. This
+   is useful with :func:`select.select`.
 
    Under Windows the small integer returned by this method cannot be used where a
    file descriptor can be used (such as :func:`os.fdopen`).  Unix does not have
    this limitation.
-
 
 .. method:: socket.get_inheritable()
 
@@ -988,6 +1000,12 @@ to sockets.
 
    On other platforms, the generic :func:`fcntl.fcntl` and :func:`fcntl.ioctl`
    functions may be used; they accept a socket object as their first argument.
+
+   Currently only the following control codes are supported:
+   ``SIO_RCVALL``, ``SIO_KEEPALIVE_VALS``, and ``SIO_LOOPBACK_FAST_PATH``.
+
+   .. versionchanged:: 3.6
+      ``SIO_LOOPBACK_FAST_PATH`` was added.
 
 .. method:: socket.listen([backlog])
 
@@ -1457,16 +1475,16 @@ The first two examples support IPv4 only. ::
 
    HOST = ''                 # Symbolic name meaning all available interfaces
    PORT = 50007              # Arbitrary non-privileged port
-   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-   s.bind((HOST, PORT))
-   s.listen(1)
-   conn, addr = s.accept()
-   print('Connected by', addr)
-   while True:
-       data = conn.recv(1024)
-       if not data: break
-       conn.sendall(data)
-   conn.close()
+   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+       s.bind((HOST, PORT))
+       s.listen(1)
+       conn, addr = s.accept()
+       with conn:
+           print('Connected by', addr)
+           while True:
+               data = conn.recv(1024)
+               if not data: break
+               conn.sendall(data)
 
 ::
 
@@ -1475,11 +1493,10 @@ The first two examples support IPv4 only. ::
 
    HOST = 'daring.cwi.nl'    # The remote host
    PORT = 50007              # The same port as used by the server
-   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-   s.connect((HOST, PORT))
-   s.sendall(b'Hello, world')
-   data = s.recv(1024)
-   s.close()
+   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+       s.connect((HOST, PORT))
+       s.sendall(b'Hello, world')
+       data = s.recv(1024)
    print('Received', repr(data))
 
 The next two examples are identical to the above two, but support both IPv4 and
@@ -1516,12 +1533,12 @@ sends traffic to the first one connected successfully. ::
        print('could not open socket')
        sys.exit(1)
    conn, addr = s.accept()
-   print('Connected by', addr)
-   while True:
-       data = conn.recv(1024)
-       if not data: break
-       conn.send(data)
-   conn.close()
+   with conn:
+       print('Connected by', addr)
+       while True:
+           data = conn.recv(1024)
+           if not data: break
+           conn.send(data)
 
 ::
 
@@ -1549,9 +1566,9 @@ sends traffic to the first one connected successfully. ::
    if s is None:
        print('could not open socket')
        sys.exit(1)
-   s.sendall(b'Hello, world')
-   data = s.recv(1024)
-   s.close()
+   with s:
+       s.sendall(b'Hello, world')
+       data = s.recv(1024)
    print('Received', repr(data))
 
 

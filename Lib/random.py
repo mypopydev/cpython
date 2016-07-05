@@ -231,7 +231,7 @@ class Random(_random.Random):
             while r >= n:
                 r = getrandbits(k)
             return r
-        # There's an overriden random() method but no new getrandbits() method,
+        # There's an overridden random() method but no new getrandbits() method,
         # so we can only use random() from here.
         if n >= maxsize:
             _warn("Underlying random() generator does not supply \n"
@@ -606,11 +606,11 @@ class Random(_random.Random):
 
         # This version due to Janne Sinkkonen, and matches all the std
         # texts (e.g., Knuth Vol 2 Ed 3 pg 134 "the beta distribution").
-        y = self.gammavariate(alpha, 1.)
+        y = self.gammavariate(alpha, 1.0)
         if y == 0:
             return 0.0
         else:
-            return y / (y + self.gammavariate(beta, 1.))
+            return y / (y + self.gammavariate(beta, 1.0))
 
 ## -------------------- Pareto --------------------
 

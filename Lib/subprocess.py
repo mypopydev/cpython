@@ -372,9 +372,11 @@ class SubprocessError(Exception): pass
 
 
 class CalledProcessError(SubprocessError):
-    """This exception is raised when a process run by check_call() or
-    check_output() returns a non-zero exit status.
-    The exit status will be stored in the returncode attribute;
+    """Raised when a check_call() or check_output() process returns non-zero.
+
+    The exit status will be stored in the returncode attribute, negative
+    if it represents a signal number.
+
     check_output() will also store the output in the output attribute.
     """
     def __init__(self, returncode, cmd, output=None, stderr=None):
@@ -384,7 +386,16 @@ class CalledProcessError(SubprocessError):
         self.stderr = stderr
 
     def __str__(self):
-        return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+        if self.returncode and self.returncode < 0:
+            try:
+                return "Command '%s' died with %r." % (
+                        self.cmd, signal.Signals(-self.returncode))
+            except ValueError:
+                return "Command '%s' died with unknown signal %d." % (
+                        self.cmd, -self.returncode)
+        else:
+            return "Command '%s' returned non-zero exit status %d." % (
+                    self.cmd, self.returncode)
 
     @property
     def stdout(self):
@@ -471,7 +482,8 @@ if _mswindows:
     __all__.extend(["CREATE_NEW_CONSOLE", "CREATE_NEW_PROCESS_GROUP",
                     "STD_INPUT_HANDLE", "STD_OUTPUT_HANDLE",
                     "STD_ERROR_HANDLE", "SW_HIDE",
-                    "STARTF_USESTDHANDLES", "STARTF_USESHOWWINDOW"])
+                    "STARTF_USESTDHANDLES", "STARTF_USESHOWWINDOW",
+                    "STARTUPINFO"])
 
     class Handle(int):
         closed = False
@@ -981,7 +993,6 @@ class Popen(object):
 
             raise
 
-
     def _translate_newlines(self, data, encoding):
         data = data.decode(encoding)
         return data.replace("\r\n", "\n").replace("\r", "\n")
@@ -1005,6 +1016,11 @@ class Popen(object):
         if not self._child_created:
             # We didn't get to successfully create a child process.
             return
+        if self.returncode is None:
+            # Not reading subprocess exit status creates a zombi process which
+            # is only destroyed at the parent python process exit
+            warnings.warn("subprocess %s is still running" % self.pid,
+                          ResourceWarning, source=self)
         # In case the child hasn't been waited on, check if it's done.
         self._internal_poll(_deadstate=_maxsize)
         if self.returncode is None and _active is not None:
@@ -1021,8 +1037,7 @@ class Popen(object):
             try:
                 self.stdin.write(input)
             except BrokenPipeError:
-                # communicate() must ignore broken pipe error
-                pass
+                pass  # communicate() must ignore broken pipe errors.
             except OSError as e:
                 if e.errno == errno.EINVAL and self.poll() is not None:
                     # Issue #19612: On Windows, stdin.write() fails with EINVAL
@@ -1030,7 +1045,15 @@ class Popen(object):
                     pass
                 else:
                     raise
-        self.stdin.close()
+        try:
+            self.stdin.close()
+        except BrokenPipeError:
+            pass  # communicate() must ignore broken pipe errors.
+        except OSError as e:
+            if e.errno == errno.EINVAL and self.poll() is not None:
+                pass
+            else:
+                raise
 
     def communicate(self, input=None, timeout=None):
         """Interact with process: Send data to stdin.  Read data from
@@ -1411,7 +1434,10 @@ class Popen(object):
             elif stderr == PIPE:
                 errread, errwrite = os.pipe()
             elif stderr == STDOUT:
-                errwrite = c2pwrite
+                if c2pwrite != -1:
+                    errwrite = c2pwrite
+                else: # child's stdout is not set, use parent's stdout
+                    errwrite = sys.__stdout__.fileno()
             elif stderr == DEVNULL:
                 errwrite = self._get_devnull()
             elif isinstance(stderr, int):
@@ -1520,9 +1546,14 @@ class Popen(object):
 
             if errpipe_data:
                 try:
-                    os.waitpid(self.pid, 0)
+                    pid, sts = os.waitpid(self.pid, 0)
+                    if pid == self.pid:
+                        self._handle_exitstatus(sts)
+                    else:
+                        self.returncode = sys.maxsize
                 except ChildProcessError:
                     pass
+
                 try:
                     exception_name, hex_errno, err_msg = (
                             errpipe_data.split(b':', 2))
@@ -1668,9 +1699,15 @@ class Popen(object):
             if self.stdin and not self._communication_started:
                 # Flush stdio buffer.  This might block, if the user has
                 # been writing to .stdin in an uncontrolled fashion.
-                self.stdin.flush()
+                try:
+                    self.stdin.flush()
+                except BrokenPipeError:
+                    pass  # communicate() must ignore BrokenPipeError.
                 if not input:
-                    self.stdin.close()
+                    try:
+                        self.stdin.close()
+                    except BrokenPipeError:
+                        pass  # communicate() must ignore BrokenPipeError.
 
             stdout = None
             stderr = None

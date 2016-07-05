@@ -5,11 +5,12 @@
    :synopsis: Tools for converting between binary and various ASCII-encoded binary
               representations.
 
-
 .. index::
    module: uu
    module: base64
    module: binhex
+
+--------------
 
 The :mod:`binascii` module contains a number of methods to convert between
 binary and various ASCII-encoded binary representations. Normally, you will not
@@ -21,7 +22,7 @@ higher-level modules.
 .. note::
 
    ``a2b_*`` functions accept Unicode strings containing only ASCII characters.
-   Other functions only accept :term:`bytes-like object`\ s (such as
+   Other functions only accept :term:`bytes-like objects <bytes-like object>` (such as
    :class:`bytes`, :class:`bytearray` and other objects that support the buffer
    protocol).
 
@@ -152,8 +153,8 @@ The :mod:`binascii` module defines the following functions:
 
    Return the binary data represented by the hexadecimal string *hexstr*.  This
    function is the inverse of :func:`b2a_hex`. *hexstr* must contain an even number
-   of hexadecimal digits (which can be upper or lower case), otherwise a
-   :exc:`TypeError` is raised.
+   of hexadecimal digits (which can be upper or lower case), otherwise an
+   :exc:`Error` exception is raised.
 
 
 .. exception:: Error

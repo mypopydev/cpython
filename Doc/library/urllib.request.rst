@@ -3,10 +3,14 @@
 
 .. module:: urllib.request
    :synopsis: Extensible library for opening URLs.
+
 .. moduleauthor:: Jeremy Hylton <jeremy@alum.mit.edu>
 .. sectionauthor:: Moshe Zadka <moshez@users.sourceforge.net>
 .. sectionauthor:: Senthil Kumaran <senthil@uthcode.com>
 
+**Source code:** :source:`Lib/urllib/request.py`
+
+--------------
 
 The :mod:`urllib.request` module defines functions and classes which help in
 opening URLs (mostly HTTP) in a complex world --- basic and digest
@@ -15,7 +19,7 @@ authentication, redirections, cookies and more.
 .. seealso::
 
     The `Requests package <https://requests.readthedocs.org/>`_
-    is recommended for a higher-level http client interface.
+    is recommended for a higher-level HTTP client interface.
 
 
 The :mod:`urllib.request` module defines the following functions:
@@ -59,7 +63,7 @@ The :mod:`urllib.request` module defines the following functions:
 
    The *cadefault* parameter is ignored.
 
-   This function always returns an object which can work as
+   This function always returns an object which can work as a
    :term:`context manager` and has methods such as
 
    * :meth:`~urllib.response.addinfourl.geturl` --- return the URL of the resource retrieved,
@@ -67,11 +71,11 @@ The :mod:`urllib.request` module defines the following functions:
 
    * :meth:`~urllib.response.addinfourl.info` --- return the meta-information of the page, such as headers,
      in the form of an :func:`email.message_from_string` instance (see
-     `Quick Reference to HTTP Headers <http://www.cs.tut.fi/~jkorpela/http.html>`_)
+     `Quick Reference to HTTP Headers <https://www.cs.tut.fi/~jkorpela/http.html>`_)
 
    * :meth:`~urllib.response.addinfourl.getcode` -- return the HTTP status code of the response.
 
-   For http and https urls, this function returns a
+   For HTTP and HTTPS URLs, this function returns a
    :class:`http.client.HTTPResponse` object slightly modified. In addition
    to the three new methods above, the msg attribute contains the
    same information as the :attr:`~http.client.HTTPResponse.reason`
@@ -79,11 +83,11 @@ The :mod:`urllib.request` module defines the following functions:
    the response headers as it is specified in the documentation for
    :class:`~http.client.HTTPResponse`.
 
-   For ftp, file, and data urls and requests explicitly handled by legacy
+   For FTP, file, and data URLs and requests explicitly handled by legacy
    :class:`URLopener` and :class:`FancyURLopener` classes, this function
    returns a :class:`urllib.response.addinfourl` object.
 
-   Raises :exc:`~urllib.error.URLError` on errors.
+   Raises :exc:`~urllib.error.URLError` on protocol errors.
 
    Note that ``None`` may be returned if no handler handles the request (though
    the default installed global :class:`OpenerDirector` uses
@@ -166,6 +170,8 @@ The :mod:`urllib.request` module defines the following functions:
    in a case insensitive approach, for all operating systems first, and when it
    cannot find it, looks for proxy information from Mac OSX System
    Configuration for Mac OS X and Windows Systems Registry for Windows.
+   If both lowercase and uppercase environment variables exist (and disagree),
+   lowercase is preferred.
 
 
 The following classes are provided:
@@ -187,7 +193,7 @@ The following classes are provided:
 
    *headers* should be a dictionary, and will be treated as if
    :meth:`add_header` was called with each key and value as arguments.
-   This is often used to "spoof" the ``User-Agent`` header, which is
+   This is often used to "spoof" the ``User-Agent`` header value, which is
    used by a browser to identify itself -- some HTTP servers only
    allow requests coming from common browsers as opposed to scripts.
    For example, Mozilla Firefox may identify itself as ``"Mozilla/5.0
@@ -268,6 +274,11 @@ The following classes are provided:
    is retrieved from the OS X System Configuration Framework.
 
    To disable autodetected proxy pass an empty dictionary.
+
+   The :envvar:`no_proxy` environment variable can be used to specify hosts
+   which shouldn't be reached via proxy; if set, it should be a comma-separated
+   list of hostname suffixes, optionally with ``:port`` appended, for example
+   ``cern.ch,ncsa.uiuc.edu,some.host:8080``.
 
 
 .. class:: HTTPPasswordMgr()
@@ -446,7 +457,7 @@ request.
 .. attribute:: Request.selector
 
    The URI path.  If the :class:`Request` uses a proxy, then selector
-   will be the full url that is passed to the proxy.
+   will be the full URL that is passed to the proxy.
 
 .. attribute:: Request.data
 
@@ -765,8 +776,8 @@ HTTPRedirectHandler Objects
    details of the precise meanings of the various redirection codes.
 
    An :class:`HTTPError` exception raised as a security consideration if the
-   HTTPRedirectHandler is presented with a redirected url which is not an HTTP,
-   HTTPS or FTP url.
+   HTTPRedirectHandler is presented with a redirected URL which is not an HTTP,
+   HTTPS or FTP URL.
 
 
 .. method:: HTTPRedirectHandler.redirect_request(req, fp, code, msg, hdrs, newurl)
@@ -1104,6 +1115,9 @@ HTTPErrorProcessor Objects
 Examples
 --------
 
+In addition to the examples below, more examples are given in
+:ref:`urllib-howto`.
+
 This example gets the python.org main page and displays the first 300 bytes of
 it. ::
 
@@ -1119,11 +1133,11 @@ it. ::
 
 Note that urlopen returns a bytes object.  This is because there is no way
 for urlopen to automatically determine the encoding of the byte stream
-it receives from the http server. In general, a program will decode
+it receives from the HTTP server. In general, a program will decode
 the returned bytes object to string once it determines or guesses
 the appropriate encoding.
 
-The following W3C document, http://www.w3.org/International/O-charset\ , lists
+The following W3C document, https://www.w3.org/International/O-charset\ , lists
 the various ways in which a (X)HTML or a XML document could have specified its
 encoding information.
 
@@ -1167,7 +1181,7 @@ The code for the sample CGI used in the above example is::
 Here is an example of doing a ``PUT`` request using :class:`Request`::
 
     import urllib.request
-    DATA=b'some data'
+    DATA = b'some data'
     req = urllib.request.Request(url='http://localhost:8080', data=DATA,method='PUT')
     with urllib.request.urlopen(req) as f:
         pass
@@ -1213,6 +1227,8 @@ Use the *headers* argument to the :class:`Request` constructor, or::
    import urllib.request
    req = urllib.request.Request('http://www.example.com/')
    req.add_header('Referer', 'http://www.python.org/')
+   # Customize the default User-Agent header value:
+   req.add_header('User-Agent', 'urllib-example/0.1 (Contact: . . .)')
    r = urllib.request.urlopen(req)
 
 :class:`OpenerDirector` automatically adds a :mailheader:`User-Agent` header to

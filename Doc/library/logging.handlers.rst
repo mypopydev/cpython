@@ -4,9 +4,10 @@
 .. module:: logging.handlers
    :synopsis: Handlers for the logging module.
 
-
 .. moduleauthor:: Vinay Sajip <vinay_sajip@red-dove.com>
 .. sectionauthor:: Vinay Sajip <vinay_sajip@red-dove.com>
+
+**Source code:** :source:`Lib/logging/handlers.py`
 
 .. sidebar:: Important
 
@@ -16,8 +17,6 @@
    * :ref:`Basic Tutorial <logging-basic-tutorial>`
    * :ref:`Advanced Tutorial <logging-advanced-tutorial>`
    * :ref:`Logging Cookbook <logging-cookbook>`
-
-**Source code:** :source:`Lib/logging/handlers.py`
 
 --------------
 
@@ -874,7 +873,7 @@ supports sending logging messages to a Web server, using either ``GET`` or
 
    .. method:: emit(record)
 
-      Sends the record to the Web server as an URL-encoded dictionary. The
+      Sends the record to the Web server as a URL-encoded dictionary. The
       :meth:`mapLogRecord` method is used to convert the record to the
       dictionary to be sent.
 

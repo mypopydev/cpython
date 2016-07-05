@@ -164,6 +164,10 @@ int pysqlite_connection_init(pysqlite_Connection* self, PyObject* args, PyObject
 #ifdef WITH_THREAD
     self->thread_ident = PyThread_get_thread_ident();
 #endif
+    if (!check_same_thread && sqlite3_libversion_number() < 3003001) {
+        PyErr_SetString(pysqlite_NotSupportedError, "shared connections not available");
+        return -1;
+    }
     self->check_same_thread = check_same_thread;
 
     self->function_pinboard = PyDict_New();
@@ -319,7 +323,7 @@ PyObject* pysqlite_connection_cursor(pysqlite_Connection* self, PyObject* args, 
 
     if (cursor && self->row_factory != Py_None) {
         Py_INCREF(self->row_factory);
-        Py_SETREF(((pysqlite_Cursor *)cursor)->row_factory, self->row_factory);
+        Py_XSETREF(((pysqlite_Cursor *)cursor)->row_factory, self->row_factory);
     }
 
     return cursor;
@@ -348,8 +352,7 @@ PyObject* pysqlite_connection_close(pysqlite_Connection* self, PyObject* args)
         }
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*
@@ -857,8 +860,7 @@ PyObject* pysqlite_connection_create_function(pysqlite_Connection* self, PyObjec
         if (PyDict_SetItem(self->function_pinboard, func, Py_None) == -1)
             return NULL;
 
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -889,8 +891,7 @@ PyObject* pysqlite_connection_create_aggregate(pysqlite_Connection* self, PyObje
         if (PyDict_SetItem(self->function_pinboard, aggregate_class, Py_None) == -1)
             return NULL;
 
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -1025,8 +1026,7 @@ static PyObject* pysqlite_connection_set_authorizer(pysqlite_Connection* self, P
         if (PyDict_SetItem(self->function_pinboard, authorizer_cb, Py_None) == -1)
             return NULL;
 
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -1055,8 +1055,7 @@ static PyObject* pysqlite_connection_set_progress_handler(pysqlite_Connection* s
             return NULL;
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject* pysqlite_connection_set_trace_callback(pysqlite_Connection* self, PyObject* args, PyObject* kwargs)
@@ -1083,8 +1082,7 @@ static PyObject* pysqlite_connection_set_trace_callback(pysqlite_Connection* sel
         sqlite3_trace(self->db, _trace_callback, trace_callback);
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 #ifdef HAVE_LOAD_EXTENSION
@@ -1107,8 +1105,7 @@ static PyObject* pysqlite_enable_load_extension(pysqlite_Connection* self, PyObj
         PyErr_SetString(pysqlite_OperationalError, "Error enabling load extension");
         return NULL;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -1131,8 +1128,7 @@ static PyObject* pysqlite_load_extension(pysqlite_Connection* self, PyObject* ar
         PyErr_SetString(pysqlite_OperationalError, errmsg);
         return NULL;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 #endif

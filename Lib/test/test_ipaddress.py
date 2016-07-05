@@ -587,7 +587,15 @@ class ComparisonTests(unittest.TestCase):
     v4_objects = v4_addresses + [v4net]
     v6_addresses = [v6addr, v6intf]
     v6_objects = v6_addresses + [v6net]
+
     objects = v4_objects + v6_objects
+
+    v4addr2 = ipaddress.IPv4Address(2)
+    v4net2 = ipaddress.IPv4Network(2)
+    v4intf2 = ipaddress.IPv4Interface(2)
+    v6addr2 = ipaddress.IPv6Address(2)
+    v6net2 = ipaddress.IPv6Network(2)
+    v6intf2 = ipaddress.IPv6Interface(2)
 
     def test_foreign_type_equality(self):
         # __eq__ should never raise TypeError directly
@@ -606,6 +614,31 @@ class ComparisonTests(unittest.TestCase):
                 if lhs is rhs:
                     continue
                 self.assertNotEqual(lhs, rhs)
+
+    def test_same_type_equality(self):
+        for obj in self.objects:
+            self.assertEqual(obj, obj)
+            self.assertLessEqual(obj, obj)
+            self.assertGreaterEqual(obj, obj)
+
+    def test_same_type_ordering(self):
+        for lhs, rhs in (
+            (self.v4addr, self.v4addr2),
+            (self.v4net, self.v4net2),
+            (self.v4intf, self.v4intf2),
+            (self.v6addr, self.v6addr2),
+            (self.v6net, self.v6net2),
+            (self.v6intf, self.v6intf2),
+        ):
+            self.assertNotEqual(lhs, rhs)
+            self.assertLess(lhs, rhs)
+            self.assertLessEqual(lhs, rhs)
+            self.assertGreater(rhs, lhs)
+            self.assertGreaterEqual(rhs, lhs)
+            self.assertFalse(lhs > rhs)
+            self.assertFalse(rhs < lhs)
+            self.assertFalse(lhs >= rhs)
+            self.assertFalse(rhs <= lhs)
 
     def test_containment(self):
         for obj in self.v4_addresses:
@@ -1143,6 +1176,7 @@ class IpaddrUnitTest(unittest.TestCase):
 
         self.assertEqual(str(self.ipv6_network[5]),
                          '2001:658:22a:cafe::5')
+        self.assertRaises(IndexError, self.ipv6_network.__getitem__, 1 << 64)
 
     def testGetitem(self):
         # http://code.google.com/p/ipaddr-py/issues/detail?id=15
@@ -1592,6 +1626,9 @@ class IpaddrUnitTest(unittest.TestCase):
                          ipaddress.ip_address('169.254.100.200').is_link_local)
         self.assertEqual(False,
                          ipaddress.ip_address('169.255.100.200').is_link_local)
+
+        self.assertTrue(ipaddress.ip_address('192.0.7.1').is_global)
+        self.assertFalse(ipaddress.ip_address('203.0.113.1').is_global)
 
         self.assertEqual(True,
                           ipaddress.ip_address('127.100.200.254').is_loopback)

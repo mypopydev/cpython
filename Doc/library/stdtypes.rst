@@ -361,19 +361,22 @@ Notes:
 All :class:`numbers.Real` types (:class:`int` and :class:`float`) also include
 the following operations:
 
-+--------------------+------------------------------------+--------+
-| Operation          | Result                             | Notes  |
-+====================+====================================+========+
-| ``math.trunc(x)``  | *x* truncated to Integral          |        |
-+--------------------+------------------------------------+--------+
-| ``round(x[, n])``  | *x* rounded to n digits,           |        |
-|                    | rounding half to even. If n is     |        |
-|                    | omitted, it defaults to 0.         |        |
-+--------------------+------------------------------------+--------+
-| ``math.floor(x)``  | the greatest integral float <= *x* |        |
-+--------------------+------------------------------------+--------+
-| ``math.ceil(x)``   | the least integral float >= *x*    |        |
-+--------------------+------------------------------------+--------+
++--------------------+---------------------------------------------+
+| Operation          | Result                                      |
++====================+=============================================+
+| :func:`math.trunc(\| *x* truncated to :class:`~numbers.Integral` |
+| x) <math.trunc>`   |                                             |
++--------------------+---------------------------------------------+
+| :func:`round(x[,   | *x* rounded to *n* digits,                  |
+| n]) <round>`       | rounding half to even. If *n* is            |
+|                    | omitted, it defaults to 0.                  |
++--------------------+---------------------------------------------+
+| :func:`math.floor(\| the greatest :class:`~numbers.Integral`     |
+| x) <math.floor>`   | <= *x*                                      |
++--------------------+---------------------------------------------+
+| :func:`math.ceil(x)| the least :class:`~numbers.Integral` >= *x* |
+| <math.ceil>`       |                                             |
++--------------------+---------------------------------------------+
 
 For additional numeric operations see the :mod:`math` and :mod:`cmath`
 modules.
@@ -4358,9 +4361,10 @@ an (external) *definition* for a module named *foo* somewhere.)
 A special attribute of every module is :attr:`~object.__dict__`. This is the
 dictionary containing the module's symbol table. Modifying this dictionary will
 actually change the module's symbol table, but direct assignment to the
-:attr:`__dict__` attribute is not possible (you can write
+:attr:`~object.__dict__` attribute is not possible (you can write
 ``m.__dict__['a'] = 1``, which defines ``m.a`` to be ``1``, but you can't write
-``m.__dict__ = {}``).  Modifying :attr:`__dict__` directly is not recommended.
+``m.__dict__ = {}``).  Modifying :attr:`~object.__dict__` directly is
+not recommended.
 
 Modules built into the interpreter are written like this: ``<module 'sys'
 (built-in)>``.  If loaded from a file, they are written as ``<module 'os' from
@@ -4434,12 +4438,12 @@ attribute, you need to explicitly set it on the underlying function object::
 See :ref:`types` for more information.
 
 
+.. index:: object; code, code object
+
 .. _bltin-code-objects:
 
 Code Objects
 ------------
-
-.. index:: object: code
 
 .. index::
    builtin: compile
@@ -4573,14 +4577,16 @@ types, where they are relevant.  Some of these are not reported by the
    The tuple of base classes of a class object.
 
 
-.. attribute:: class.__name__
+.. attribute:: definition.__name__
 
-   The name of the class or type.
+   The name of the class, function, method, descriptor, or
+   generator instance.
 
 
-.. attribute:: class.__qualname__
+.. attribute:: definition.__qualname__
 
-   The :term:`qualified name` of the class or type.
+   The :term:`qualified name` of the class, function, method, descriptor,
+   or generator instance.
 
    .. versionadded:: 3.3
 

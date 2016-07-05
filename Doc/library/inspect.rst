@@ -3,6 +3,7 @@
 
 .. module:: inspect
    :synopsis: Extract information and source code from live objects.
+
 .. moduleauthor:: Ka-Ping Yee <ping@lfw.org>
 .. sectionauthor:: Ka-Ping Yee <ping@lfw.org>
 
@@ -354,8 +355,9 @@ attributes:
    are true.
 
    This, for example, is true of ``int.__add__``.  An object passing this test
-   has a :attr:`__get__` attribute but not a :attr:`__set__` attribute, but
-   beyond that the set of attributes varies.  :attr:`__name__` is usually
+   has a :meth:`~object.__get__` method but not a :meth:`~object.__set__`
+   method, but beyond that the set of attributes varies.  A
+   :attr:`~definition.__name__` attribute is usually
    sensible, and :attr:`__doc__` often is.
 
    Methods implemented via descriptors that also pass one of the other tests
@@ -368,11 +370,11 @@ attributes:
 
    Return true if the object is a data descriptor.
 
-   Data descriptors have both a :attr:`__get__` and a :attr:`__set__` attribute.
+   Data descriptors have both a :attr:`~object.__get__` and a :attr:`~object.__set__` method.
    Examples are properties (defined in Python), getsets, and members.  The
    latter two are defined in C and there are more specific tests available for
    those types, which is robust across Python implementations.  Typically, data
-   descriptors will also have :attr:`__name__` and :attr:`__doc__` attributes
+   descriptors will also have :attr:`~definition.__name__` and :attr:`__doc__` attributes
    (properties, getsets, and members have both of these attributes), but this is
    not guaranteed.
 
@@ -470,8 +472,12 @@ Retrieving source code
 .. function:: cleandoc(doc)
 
    Clean up indentation from docstrings that are indented to line up with blocks
-   of code.  Any whitespace that can be uniformly removed from the second line
-   onwards is removed.  Also, all tabs are expanded to spaces.
+   of code.
+
+   All leading whitespace is removed from the first line.  Any leading whitespace
+   that can be uniformly removed from the second line onwards is removed.  Empty
+   lines at the beginning and end are subsequently removed.  Also, all tabs are
+   expanded to spaces.
 
 
 .. _inspect-signature-object:
@@ -621,6 +627,16 @@ function.
       The name of the parameter as a string.  The name must be a valid
       Python identifier.
 
+      .. impl-detail::
+
+         CPython generates implicit parameter names of the form ``.0`` on the
+         code objects used to implement comprehensions and generator
+         expressions.
+
+         .. versionchanged:: 3.6
+            These parameter names are exposed by this module as names like
+            ``implicit0``.
+
    .. attribute:: Parameter.default
 
       The default value for the parameter.  If the parameter has no default
@@ -768,7 +784,7 @@ function.
    functions::
 
       def test(a, *, b):
-         ...
+          ...
 
       sig = signature(test)
       ba = sig.bind(10, b=20)

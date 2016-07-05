@@ -177,6 +177,9 @@
     <ClInclude Include="..\Include\osdefs.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\Include\osmodule.h">
+      <Filter>Include</Filter>
+    </ClInclude>
     <ClInclude Include="..\Include\parsetok.h">
       <Filter>Include</Filter>
     </ClInclude>
@@ -418,6 +421,9 @@
       <Filter>Python</Filter>
     </ClInclude>
     <ClInclude Include="..\Python\thread_nt.h">
+      <Filter>Python</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Python\wordcode_helpers.h">
       <Filter>Python</Filter>
     </ClInclude>
     <ClInclude Include="..\Python\condvar.h">

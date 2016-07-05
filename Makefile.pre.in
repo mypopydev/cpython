@@ -109,6 +109,7 @@ MACHDEP=	@MACHDEP@
 
 # Multiarch directory (may be empty)
 MULTIARCH=	@MULTIARCH@
+MULTIARCH_CPPFLAGS = @MULTIARCH_CPPFLAGS@
 
 # Install prefix for architecture-independent files
 prefix=		@prefix@
@@ -221,6 +222,7 @@ LIBOBJS=	@LIBOBJS@
 PYTHON=		python$(EXE)
 BUILDPYTHON=	python$(BUILDEXE)
 
+cross_compiling=@cross_compiling@
 PYTHON_FOR_BUILD=@PYTHON_FOR_BUILD@
 _PYTHON_HOST_PLATFORM=@_PYTHON_HOST_PLATFORM@
 BUILD_GNU_TYPE=	@build@
@@ -230,8 +232,10 @@ HOST_GNU_TYPE=	@host@
 TCLTK_INCLUDES=	@TCLTK_INCLUDES@
 TCLTK_LIBS=	@TCLTK_LIBS@
 
-# The task to run while instrument when building the profile-opt target
-PROFILE_TASK=-m test.regrtest --pgo
+# The task to run while instrumented when building the profile-opt target.
+# We exclude unittests with -x that take a rediculious amount of time to
+# run in the instrumented training build or do not provide much value.
+PROFILE_TASK=-m test.regrtest --pgo -x test_asyncore test_gdb test_multiprocessing_fork test_multiprocessing_forkserver test_multiprocessing_main_handling test_multiprocessing_spawn test_subprocess
 
 # report files for gcov / lcov coverage report
 COVERAGE_INFO=	$(abs_builddir)/coverage.info
@@ -502,7 +506,7 @@ profile-opt:
 	$(MAKE) profile-removal
 
 build_all_generate_profile:
-	$(MAKE) all CFLAGS_NODIST="$(CFLAGS) $(PGO_PROF_GEN_FLAG)" LDFLAGS="$(LDFLAGS) $(PGO_PROF_GEN_FLAG)" LIBS="$(LIBS)"
+	$(MAKE) all CFLAGS_NODIST="$(CFLAGS) $(PGO_PROF_GEN_FLAG) @LTOFLAGS@" LDFLAGS="$(LDFLAGS) $(PGO_PROF_GEN_FLAG) @LTOFLAGS@" LIBS="$(LIBS)"
 
 run_profile_task:
 	: # FIXME: can't run for a cross build
@@ -512,7 +516,7 @@ build_all_merge_profile:
 	$(LLVM_PROF_MERGER)
 
 build_all_use_profile:
-	$(MAKE) all CFLAGS_NODIST="$(CFLAGS) $(PGO_PROF_USE_FLAG)"
+	$(MAKE) all CFLAGS_NODIST="$(CFLAGS) $(PGO_PROF_USE_FLAG) @LTOFLAGS@" LDFLAGS="$(LDFLAGS) @LTOFLAGS@"
 
 # Compile and run with gcov
 .PHONY=coverage coverage-lcov coverage-report
@@ -716,12 +720,16 @@ Programs/_freeze_importlib: Programs/_freeze_importlib.o $(LIBRARY_OBJS_OMIT_FRO
 	$(LINKCC) $(PY_LDFLAGS) -o $@ Programs/_freeze_importlib.o $(LIBRARY_OBJS_OMIT_FROZEN) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
 
 Python/importlib_external.h: $(srcdir)/Lib/importlib/_bootstrap_external.py Programs/_freeze_importlib
-	./Programs/_freeze_importlib \
-		$(srcdir)/Lib/importlib/_bootstrap_external.py Python/importlib_external.h
+	if test "$(cross_compiling)" != "yes"; then \
+	    ./Programs/_freeze_importlib \
+	        $(srcdir)/Lib/importlib/_bootstrap_external.py Python/importlib_external.h; \
+	fi
 
 Python/importlib.h: $(srcdir)/Lib/importlib/_bootstrap.py Programs/_freeze_importlib
-	./Programs/_freeze_importlib \
-		$(srcdir)/Lib/importlib/_bootstrap.py Python/importlib.h
+	if test "$(cross_compiling)" != "yes"; then \
+	    ./Programs/_freeze_importlib \
+	        $(srcdir)/Lib/importlib/_bootstrap.py Python/importlib.h; \
+	fi
 
 
 ############################################################################
@@ -777,15 +785,27 @@ Python/dynload_hpux.o: $(srcdir)/Python/dynload_hpux.c Makefile
 Python/sysmodule.o: $(srcdir)/Python/sysmodule.c Makefile
 	$(CC) -c $(PY_CORE_CFLAGS) \
 		-DABIFLAGS='"$(ABIFLAGS)"' \
+		$(MULTIARCH_CPPFLAGS) \
 		-o $@ $(srcdir)/Python/sysmodule.c
 
 $(IO_OBJS): $(IO_H)
 
 $(GRAMMAR_H): $(GRAMMAR_INPUT) $(PGEN)
-		@$(MKDIR_P) Include
-		$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+	@$(MKDIR_P) Include
+	# Avoid copying the file onto itself for an in-tree build
+	if test "$(cross_compiling)" != "yes"; then \
+		$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C); \
+	else \
+		cp $(srcdir)/Include/graminit.h $(GRAMMAR_H).tmp; \
+		mv $(GRAMMAR_H).tmp $(GRAMMAR_H); \
+	fi
 $(GRAMMAR_C): $(GRAMMAR_H)
-		touch $(GRAMMAR_C)
+	if test "$(cross_compiling)" != "yes"; then \
+		touch $(GRAMMAR_C); \
+	else \
+		cp $(srcdir)/Python/graminit.c $(GRAMMAR_C).tmp; \
+		mv $(GRAMMAR_C).tmp $(GRAMMAR_C); \
+	fi
 
 $(PGEN): $(PGENOBJS)
 		$(CC) $(OPT) $(PY_LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
@@ -925,6 +945,7 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/objimpl.h \
 		$(OPCODE_H) \
 		$(srcdir)/Include/osdefs.h \
+		$(srcdir)/Include/osmodule.h \
 		$(srcdir)/Include/patchlevel.h \
 		$(srcdir)/Include/pgen.h \
 		$(srcdir)/Include/pgenheaders.h \
@@ -1244,7 +1265,7 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR) $(srcdir)/Modules/xxmodule.c
 		else	true; \
 		fi; \
 	done
-	@for i in $(srcdir)/Lib/*.py `cat pybuilddir.txt`/_sysconfigdata.py; \
+	@for i in $(srcdir)/Lib/*.py; \
 	do \
 		if test -x $$i; then \
 			$(INSTALL_SCRIPT) $$i $(DESTDIR)$(LIBDEST); \
@@ -1279,6 +1300,10 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR) $(srcdir)/Modules/xxmodule.c
 			esac; \
 		done; \
 	done
+	$(INSTALL_DATA) `cat pybuilddir.txt`/_sysconfigdata_$(ABIFLAGS).py \
+		$(DESTDIR)$(LIBDEST)/$(PLATDIR); \
+	echo $(INSTALL_DATA) `cat pybuilddir.txt`/_sysconfigdata_$(ABIFLAGS).py \
+		$(LIBDEST)/$(PLATDIR)
 	$(INSTALL_DATA) $(srcdir)/LICENSE $(DESTDIR)$(LIBDEST)/LICENSE.txt
 	if test -d $(DESTDIR)$(LIBDEST)/distutils/tests; then \
 		$(INSTALL_DATA) $(srcdir)/Modules/xxmodule.c \
@@ -1317,13 +1342,19 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR) $(srcdir)/Modules/xxmodule.c
 		$(PYTHON_FOR_BUILD) -m lib2to3.pgen2.driver $(DESTDIR)$(LIBDEST)/lib2to3/PatternGrammar.txt
 
 # Create the PLATDIR source directory, if one wasn't distributed..
+# For multiarch targets, use the plat-linux/regen script.
 $(srcdir)/Lib/$(PLATDIR):
 	mkdir $(srcdir)/Lib/$(PLATDIR)
-	cp $(srcdir)/Lib/plat-generic/regen $(srcdir)/Lib/$(PLATDIR)/regen
+	if [ -n "$(MULTIARCH)" ]; then \
+	  cp $(srcdir)/Lib/plat-linux/regen $(srcdir)/Lib/$(PLATDIR)/regen; \
+	else \
+	  cp $(srcdir)/Lib/plat-generic/regen $(srcdir)/Lib/$(PLATDIR)/regen; \
+	fi; \
 	export PATH; PATH="`pwd`:$$PATH"; \
 	export PYTHONPATH; PYTHONPATH="`pwd`/Lib"; \
 	export DYLD_FRAMEWORK_PATH; DYLD_FRAMEWORK_PATH="`pwd`"; \
 	export EXE; EXE="$(BUILDEXE)"; \
+	export CC; CC="$(CC)"; \
 	if [ -n "$(MULTIARCH)" ]; then export MULTIARCH; MULTIARCH=$(MULTIARCH); fi; \
 	export PYTHON_FOR_BUILD; \
 	if [ "$(BUILD_GNU_TYPE)" = "$(HOST_GNU_TYPE)" ]; then \
@@ -1331,6 +1362,7 @@ $(srcdir)/Lib/$(PLATDIR):
 	else \
 	  PYTHON_FOR_BUILD="$(PYTHON_FOR_BUILD)"; \
 	fi; \
+	export H2PY; H2PY="$$PYTHON_FOR_BUILD $(abs_srcdir)/Tools/scripts/h2py.py"; \
 	cd $(srcdir)/Lib/$(PLATDIR); $(RUNSHARED) ./regen
 
 python-config: $(srcdir)/Misc/python-config.in Misc/python-config.sh
@@ -1429,7 +1461,7 @@ sharedinstall: sharedmods
 		--install-scripts=$(BINDIR) \
 		--install-platlib=$(DESTSHARED) \
 		--root=$(DESTDIR)/
-	-rm $(DESTDIR)$(DESTSHARED)/_sysconfigdata.py
+	-rm $(DESTDIR)$(DESTSHARED)/_sysconfigdata_$(ABIFLAGS).py
 	-rm -r $(DESTDIR)$(DESTSHARED)/__pycache__
 
 # Here are a couple of targets for MacOSX again, to install a full
@@ -1438,7 +1470,7 @@ sharedinstall: sharedmods
 # the Makefile in Mac
 #
 #
-# This target is here for backward compatiblity, previous versions of Python
+# This target is here for backward compatibility, previous versions of Python
 # hadn't integrated framework installation in the normal install process.
 frameworkinstall: install
 
@@ -1475,10 +1507,10 @@ frameworkinstallstructure:	$(LDLIBRARY)
 # Install a number of symlinks to keep software that expects a normal unix
 # install (which includes python-config) happy.
 frameworkinstallmaclib:
-	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(LDVERSION).a"
-	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(LDVERSION).dylib"
-	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(VERSION).a"
-	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(VERSION).dylib"
+	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(LIBPL)/libpython$(LDVERSION).a"
+	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(LIBPL)/libpython$(LDVERSION).dylib"
+	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(LIBPL)/libpython$(VERSION).a"
+	$(LN) -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(LIBPL)/libpython$(VERSION).dylib"
 	$(LN) -fs "../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/libpython$(LDVERSION).dylib"
 	$(LN) -fs "../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/libpython$(VERSION).dylib"
 
@@ -1608,6 +1640,9 @@ clobber: clean profile-removal
 	-rm -rf build platform
 	-rm -rf $(PYTHONFRAMEWORKDIR)
 	-rm -f python-config.py python-config
+	if [ -n "$(MULTIARCH)" ]; then \
+	  rm -rf $(srcdir)/Lib/$(PLATDIR); \
+	fi
 
 # Make things extra clean, before making a distribution:
 # remove all generated files, even Makefile[.pre]

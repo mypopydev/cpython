@@ -36,7 +36,6 @@
 #include <stdlib.h>
 
 #include "docstrings.h"
-#include "memory.h"
 
 
 #if !defined(MPD_VERSION_HEX) || MPD_VERSION_HEX < 0x02040100
@@ -2630,12 +2629,18 @@ PyDecType_FromSequenceExact(PyTypeObject *type, PyObject *v,
 
 /* class method */
 static PyObject *
-dec_from_float(PyObject *dec, PyObject *pyfloat)
+dec_from_float(PyObject *type, PyObject *pyfloat)
 {
     PyObject *context;
+    PyObject *result;
 
     CURRENT_CONTEXT(context);
-    return PyDecType_FromFloatExact((PyTypeObject *)dec, pyfloat, context);
+    result = PyDecType_FromFloatExact(&PyDec_Type, pyfloat, context);
+    if (type != (PyObject *)&PyDec_Type && result != NULL) {
+        Py_SETREF(result, PyObject_CallFunctionObjArgs(type, result, NULL));
+    }
+
+    return result;
 }
 
 /* create_decimal_from_float */

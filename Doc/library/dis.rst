@@ -31,9 +31,9 @@ the following command can be used to display the disassembly of
 
    >>> dis.dis(myfunc)
      2           0 LOAD_GLOBAL              0 (len)
-                 3 LOAD_FAST                0 (alist)
-                 6 CALL_FUNCTION            1
-                 9 RETURN_VALUE
+                 2 LOAD_FAST                0 (alist)
+                 4 CALL_FUNCTION            1
+                 6 RETURN_VALUE
 
 (The "2" is a line number).
 
@@ -139,11 +139,11 @@ operation is being performed, so the intermediate analysis object isn't useful:
    Disassemble the *x* object.  *x* can denote either a module, a class, a
    method, a function, a generator, a code object, a string of source code or
    a byte sequence of raw bytecode.  For a module, it disassembles all functions.
-   For a class, it disassembles all methods.  For a code object or sequence of
-   raw bytecode, it prints one line per bytecode instruction.  Strings are first
-   compiled to code objects with the :func:`compile` built-in function before being
-   disassembled.  If no object is provided, this function disassembles the last
-   traceback.
+   For a class, it disassembles all methods (including class and static methods).
+   For a code object or sequence of raw bytecode, it prints one line per bytecode
+   instruction.  Strings are first compiled to code objects with the :func:`compile`
+   built-in function before being disassembled.  If no object is provided, this
+   function disassembles the last traceback.
 
    The disassembly is written as text to the supplied *file* argument if
    provided and to ``sys.stdout`` otherwise.
@@ -682,8 +682,7 @@ iterations of the loop.
    .. XXX explain the WHY stuff!
 
 
-All of the following opcodes expect arguments.  An argument is two bytes, with
-the more significant byte last.
+All of the following opcodes use their arguments.
 
 .. opcode:: STORE_NAME (namei)
 
@@ -708,7 +707,7 @@ the more significant byte last.
 
    Implements assignment with a starred target: Unpacks an iterable in TOS into
    individual values, where the total number of values can be smaller than the
-   number of items in the iterable: one the new values will be a list of all
+   number of items in the iterable: one of the new values will be a list of all
    leftover items.
 
    The low byte of *counts* is the number of values before the list value, the
@@ -767,6 +766,15 @@ the more significant byte last.
 
    Pushes a new dictionary object onto the stack.  The dictionary is pre-sized
    to hold *count* entries.
+
+
+.. opcode:: BUILD_CONST_KEY_MAP (count)
+
+   The version of :opcode:`BUILD_MAP` specialized for constant keys.  *count*
+   values are consumed from the stack.  The top element on the stack contains
+   a tuple of keys.
+
+   .. versionadded:: 3.6
 
 
 .. opcode:: LOAD_ATTR (namei)
@@ -929,25 +937,14 @@ the more significant byte last.
 .. opcode:: MAKE_FUNCTION (argc)
 
    Pushes a new function object on the stack.  From bottom to top, the consumed
-   stack must consist of
+   stack must consist of values if the argument carries a specified flag value
 
-   * ``argc & 0xFF`` default argument objects in positional order
-   * ``(argc >> 8) & 0xFF`` pairs of name and default argument, with the name
-     just below the object on the stack, for keyword-only parameters
-   * ``(argc >> 16) & 0x7FFF`` parameter annotation objects
-   * a tuple listing the parameter names for the annotations (only if there are
-     ony annotation objects)
+   * ``0x01`` a tuple of default argument objects in positional order
+   * ``0x02`` a dictionary of keyword-only parameters' default values
+   * ``0x04`` an annotation dictionary
+   * ``0x08`` a tuple containing cells for free variables, making a closure
    * the code associated with the function (at TOS1)
    * the :term:`qualified name` of the function (at TOS)
-
-
-.. opcode:: MAKE_CLOSURE (argc)
-
-   Creates a new function object, sets its *__closure__* slot, and pushes it on
-   the stack.  TOS is the :term:`qualified name` of the function, TOS1 is the
-   code associated with the function, and TOS2 is the tuple containing cells for
-   the closure's free variables.  *argc* is interpreted as in ``MAKE_FUNCTION``;
-   the annotations and defaults are also in the same order below TOS2.
 
 
 .. opcode:: BUILD_SLICE (argc)

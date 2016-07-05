@@ -315,7 +315,7 @@ You can see it if you really want to using :func:`print`::
 It is simple to write a function that returns a list of the numbers of the
 Fibonacci series, instead of printing it::
 
-   >>> def fib2(n): # return Fibonacci series up to n
+   >>> def fib2(n):  # return Fibonacci series up to n
    ...     """Return a list containing the Fibonacci series up to n."""
    ...     result = []
    ...     a, b = 0, 1
@@ -364,7 +364,7 @@ The most useful form is to specify a default value for one or more arguments.
 This creates a function that can be called with fewer arguments than it is
 defined to allow.  For example::
 
-   def ask_ok(prompt, retries=4, complaint='Yes or no, please!'):
+   def ask_ok(prompt, retries=4, reminder='Please try again!'):
        while True:
            ok = input(prompt)
            if ok in ('y', 'ye', 'yes'):
@@ -373,8 +373,8 @@ defined to allow.  For example::
                return False
            retries = retries - 1
            if retries < 0:
-               raise OSError('uncooperative user')
-           print(complaint)
+               raise ValueError('invalid user response')
+           print(reminder)
 
 This function can be called in several ways:
 
@@ -543,7 +543,7 @@ parameter are 'keyword-only' arguments, meaning that they can only be used as
 keywords rather than positional arguments. ::
 
    >>> def concat(*args, sep="/"):
-   ...    return sep.join(args)
+   ...     return sep.join(args)
    ...
    >>> concat("earth", "mars", "venus")
    'earth/mars/venus'

@@ -190,8 +190,8 @@ bufferediobase_read1(PyObject *self, PyObject *args)
 PyDoc_STRVAR(bufferediobase_write_doc,
     "Write the given buffer to the IO stream.\n"
     "\n"
-    "Returns the number of bytes written, which is never less than\n"
-    "len(b).\n"
+    "Returns the number of bytes written, which is always the length of b\n"
+    "in bytes.\n"
     "\n"
     "Raises BlockingIOError if the buffer is full and the\n"
     "underlying raw stream cannot accept more data at the moment.\n");
@@ -1196,7 +1196,7 @@ found:
         Py_CLEAR(res);
         goto end;
     }
-    Py_SETREF(res, _PyBytes_Join(_PyIO_empty_bytes, chunks));
+    Py_XSETREF(res, _PyBytes_Join(_PyIO_empty_bytes, chunks));
 
 end:
     LEAVE_BUFFERED(self)
@@ -1452,7 +1452,7 @@ _io_BufferedReader___init___impl(buffered *self, PyObject *raw,
         return -1;
 
     Py_INCREF(raw);
-    Py_SETREF(self->raw, raw);
+    Py_XSETREF(self->raw, raw);
     self->buffer_size = buffer_size;
     self->readable = 1;
     self->writable = 0;
@@ -1804,7 +1804,7 @@ _io_BufferedWriter___init___impl(buffered *self, PyObject *raw,
         return -1;
 
     Py_INCREF(raw);
-    Py_SETREF(self->raw, raw);
+    Py_XSETREF(self->raw, raw);
     self->readable = 0;
     self->writable = 1;
 
@@ -2307,7 +2307,7 @@ _io_BufferedRandom___init___impl(buffered *self, PyObject *raw,
         return -1;
 
     Py_INCREF(raw);
-    Py_SETREF(self->raw, raw);
+    Py_XSETREF(self->raw, raw);
     self->buffer_size = buffer_size;
     self->readable = 1;
     self->writable = 1;

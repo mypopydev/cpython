@@ -20,6 +20,7 @@ Data members:
 #include "pythread.h"
 
 #include "osdefs.h"
+#include <locale.h>
 
 #ifdef MS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -33,7 +34,6 @@ extern const char *PyWin_DLLVersionString;
 #endif
 
 #ifdef HAVE_LANGINFO_H
-#include <locale.h>
 #include <langinfo.h>
 #endif
 
@@ -436,7 +436,7 @@ trace_trampoline(PyObject *self, PyFrameObject *frame,
         return -1;
     }
     if (result != Py_None) {
-        Py_SETREF(frame->f_trace, result);
+        Py_XSETREF(frame->f_trace, result);
     }
     else {
         Py_DECREF(result);
@@ -1692,6 +1692,16 @@ make_impl_info(PyObject *version_info)
     Py_DECREF(value);
     if (res < 0)
         goto error;
+
+#ifdef MULTIARCH
+    value = PyUnicode_FromString(MULTIARCH);
+    if (value == NULL)
+        goto error;
+    res = PyDict_SetItemString(impl_info, "_multiarch", value);
+    Py_DECREF(value);
+    if (res < 0)
+        goto error;
+#endif
 
     /* dict ready */
 

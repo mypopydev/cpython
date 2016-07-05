@@ -26,7 +26,6 @@ from itertools import chain
 from .pgen2 import driver, tokenize, token
 from .fixer_util import find_root
 from . import pytree, pygram
-from . import btm_utils as bu
 from . import btm_matcher as bm
 
 
@@ -184,7 +183,7 @@ class RefactoringTool(object):
 
         Args:
             fixer_names: a list of fixers to import
-            options: an dict with configuration.
+            options: a dict with configuration.
             explicit: a list of fixers to run even if they are explicit.
         """
         self.fixers = fixer_names

@@ -4,7 +4,6 @@
 .. module:: tarfile
    :synopsis: Read and write tar-format archive files.
 
-
 .. moduleauthor:: Lars Gustäbel <lars@gustaebel.de>
 .. sectionauthor:: Lars Gustäbel <lars@gustaebel.de>
 
@@ -65,19 +64,19 @@ Some facts and figures:
    | ``'x'`` or       | Create a tarfile exclusively without        |
    | ``'x:'``         | compression.                                |
    |                  | Raise an :exc:`FileExistsError` exception   |
-   |                  | if it is already exists.                    |
+   |                  | if it already exists.                       |
    +------------------+---------------------------------------------+
    | ``'x:gz'``       | Create a tarfile with gzip compression.     |
    |                  | Raise an :exc:`FileExistsError` exception   |
-   |                  | if it is already exists.                    |
+   |                  | if it already exists.                       |
    +------------------+---------------------------------------------+
    | ``'x:bz2'``      | Create a tarfile with bzip2 compression.    |
    |                  | Raise an :exc:`FileExistsError` exception   |
-   |                  | if it is already exists.                    |
+   |                  | if it already exists.                       |
    +------------------+---------------------------------------------+
    | ``'x:xz'``       | Create a tarfile with lzma compression.     |
    |                  | Raise an :exc:`FileExistsError` exception   |
-   |                  | if it is already exists.                    |
+   |                  | if it already exists.                       |
    +------------------+---------------------------------------------+
    | ``'a' or 'a:'``  | Open for appending with no compression. The |
    |                  | file is created if it does not exist.       |
@@ -101,7 +100,7 @@ Some facts and figures:
 
    For modes ``'w:gz'``, ``'r:gz'``, ``'w:bz2'``, ``'r:bz2'``, ``'x:gz'``,
    ``'x:bz2'``, :func:`tarfile.open` accepts the keyword argument
-   *compresslevel* to specify the compression level of the file.
+   *compresslevel* (default ``9``) to specify the compression level of the file.
 
    For special purposes, there is a second format for *mode*:
    ``'filemode|[compression]'``.  :func:`tarfile.open` will return a :class:`TarFile`
@@ -129,7 +128,7 @@ Some facts and figures:
    | ``'r|bz2'`` | Open a bzip2 compressed *stream* for       |
    |             | reading.                                   |
    +-------------+--------------------------------------------+
-   | ``'r|xz'``  | Open a lzma compressed *stream* for        |
+   | ``'r|xz'``  | Open an lzma compressed *stream* for       |
    |             | reading.                                   |
    +-------------+--------------------------------------------+
    | ``'w|'``    | Open an uncompressed *stream* for writing. |
@@ -149,8 +148,8 @@ Some facts and figures:
 
 .. class:: TarFile
 
-   Class for reading and writing tar archives. Do not use this class directly,
-   better use :func:`tarfile.open` instead. See :ref:`tarfile-objects`.
+   Class for reading and writing tar archives. Do not use this class directly:
+   use :func:`tarfile.open` instead. See :ref:`tarfile-objects`.
 
 
 .. function:: is_tarfile(name)
@@ -238,7 +237,7 @@ details.
       Documentation of the higher-level archiving facilities provided by the
       standard :mod:`shutil` module.
 
-   `GNU tar manual, Basic Tar Format <http://www.gnu.org/software/tar/manual/html_node/Standard.html>`_
+   `GNU tar manual, Basic Tar Format <https://www.gnu.org/software/tar/manual/html_node/Standard.html>`_
       Documentation for tar archive files, including GNU tar extensions.
 
 
@@ -272,7 +271,7 @@ be finalized; only the internally used file object will be closed. See the
 
    *mode* is either ``'r'`` to read from an existing archive, ``'a'`` to append
    data to an existing file, ``'w'`` to create a new file overwriting an existing
-   one or ``'x'`` to create a new file only if it's not exists.
+   one, or ``'x'`` to create a new file only if it does not already exist.
 
    If *fileobj* is given, it is used for reading or writing data. If it can be
    determined, *mode* is overridden by *fileobj*'s mode. *fileobj* will be used

@@ -223,6 +223,8 @@ get_locale_encoding(void)
         return NULL;
     }
     return get_codec_name(codeset);
+#elif defined(__ANDROID__)
+    return get_codec_name("UTF-8");
 #else
     PyErr_SetNone(PyExc_NotImplementedError);
     return NULL;
@@ -624,7 +626,7 @@ Py_FinalizeEx(void)
 
     /* Debugging stuff */
 #ifdef COUNT_ALLOCS
-    dump_counts(stdout);
+    dump_counts(stderr);
 #endif
     /* dump hash stats */
     _PyHash_Fini();
@@ -744,9 +746,11 @@ Py_NewInterpreter(void)
     if (!initialized)
         Py_FatalError("Py_NewInterpreter: call Py_Initialize first");
 
+#ifdef WITH_THREAD
     /* Issue #10915, #15751: The GIL API doesn't work with multiple
        interpreters: disable PyGILState_Check(). */
     _PyGILState_check_enabled = 0;
+#endif
 
     interp = PyInterpreterState_New();
     if (interp == NULL)
@@ -1166,15 +1170,6 @@ initstdio(void)
     encoding = _Py_StandardStreamEncoding;
     errors = _Py_StandardStreamErrors;
     if (!encoding || !errors) {
-        if (!errors) {
-            /* When the LC_CTYPE locale is the POSIX locale ("C locale"),
-               stdin and stdout use the surrogateescape error handler by
-               default, instead of the strict error handler. */
-            char *loc = setlocale(LC_CTYPE, NULL);
-            if (loc != NULL && strcmp(loc, "C") == 0)
-                errors = "surrogateescape";
-        }
-
         pythonioencoding = Py_GETENV("PYTHONIOENCODING");
         if (pythonioencoding) {
             char *err;
@@ -1187,13 +1182,21 @@ initstdio(void)
             if (err) {
                 *err = '\0';
                 err++;
-                if (*err && !_Py_StandardStreamErrors) {
+                if (*err && !errors) {
                     errors = err;
                 }
             }
             if (*pythonioencoding && !encoding) {
                 encoding = pythonioencoding;
             }
+        }
+        if (!errors && !(pythonioencoding && *pythonioencoding)) {
+            /* When the LC_CTYPE locale is the POSIX locale ("C locale"),
+               stdin and stdout use the surrogateescape error handler by
+               default, instead of the strict error handler. */
+            char *loc = setlocale(LC_CTYPE, NULL);
+            if (loc != NULL && strcmp(loc, "C") == 0)
+                errors = "surrogateescape";
         }
     }
 
@@ -1406,7 +1409,7 @@ exit:
 /* Clean up and exit */
 
 #ifdef WITH_THREAD
-#include "pythread.h"
+#  include "pythread.h"
 #endif
 
 static void (*pyexitfunc)(void) = NULL;

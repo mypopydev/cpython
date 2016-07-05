@@ -397,6 +397,8 @@ Miscellaneous options
      stored in a traceback of a trace. Use ``-X tracemalloc=NFRAME`` to start
      tracing with a traceback limit of *NFRAME* frames. See the
      :func:`tracemalloc.start` for more information.
+   * ``-X showalloccount`` to enable the output of the total count of allocated
+     objects for each type (only works when built with ``COUNT_ALLOCS`` defined);
 
    It also allows passing arbitrary values and retrieving them through the
    :data:`sys._xoptions` dictionary.
@@ -409,6 +411,9 @@ Miscellaneous options
 
    .. versionadded:: 3.4
       The ``-X showrefcount`` and ``-X tracemalloc`` options.
+
+   .. versionadded:: 3.6
+      The ``-X showalloccount`` option.
 
 
 Options you shouldn't use
@@ -628,12 +633,11 @@ conflict.
    Set the family of memory allocators used by Python:
 
    * ``malloc``: use the :c:func:`malloc` function of the C library
-     for all Python memory allocators (ex: :c:func:`PyMem_RawMalloc`,
-     :c:func:`PyMem_Malloc` and :c:func:`PyObject_Malloc`).
-   * ``pymalloc``: :c:func:`PyObject_Malloc`, :c:func:`PyObject_Calloc` and
-     :c:func:`PyObject_Realloc` use the :ref:`pymalloc allocator <pymalloc>`.
-     Other Python memory allocators (ex: :c:func:`PyMem_RawMalloc` and
-     :c:func:`PyMem_Malloc`) use :c:func:`malloc`.
+     for all domains (:c:data:`PYMEM_DOMAIN_RAW`, :c:data:`PYMEM_DOMAIN_MEM`,
+     :c:data:`PYMEM_DOMAIN_OBJ`).
+   * ``pymalloc``: use the :ref:`pymalloc allocator <pymalloc>` for
+     :c:data:`PYMEM_DOMAIN_MEM` and :c:data:`PYMEM_DOMAIN_OBJ` domains and use
+     the :c:func:`malloc` function for the :c:data:`PYMEM_DOMAIN_RAW` domain.
 
    Install debug hooks:
 

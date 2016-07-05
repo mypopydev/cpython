@@ -10,7 +10,7 @@ from abc import ABCMeta, abstractmethod
 import sys
 
 __all__ = ["Awaitable", "Coroutine", "AsyncIterable", "AsyncIterator",
-           "Hashable", "Iterable", "Iterator", "Generator",
+           "Hashable", "Iterable", "Iterator", "Generator", "Reversible",
            "Sized", "Container", "Callable",
            "Set", "MutableSet",
            "Mapping", "MutableMapping",
@@ -156,7 +156,7 @@ class AsyncIterable(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    async def __aiter__(self):
+    def __aiter__(self):
         return AsyncIterator()
 
     @classmethod
@@ -176,7 +176,7 @@ class AsyncIterator(AsyncIterable):
         """Return the next item or raise StopAsyncIteration when exhausted."""
         raise StopAsyncIteration
 
-    async def __aiter__(self):
+    def __aiter__(self):
         return self
 
     @classmethod
@@ -238,6 +238,25 @@ Iterator.register(set_iterator)
 Iterator.register(str_iterator)
 Iterator.register(tuple_iterator)
 Iterator.register(zip_iterator)
+
+
+class Reversible(Iterable):
+
+    __slots__ = ()
+
+    @abstractmethod
+    def __reversed__(self):
+        return NotImplemented
+
+    @classmethod
+    def __subclasshook__(cls, C):
+        if cls is Reversible:
+            for B in C.__mro__:
+                if "__reversed__" in B.__dict__:
+                    if B.__dict__["__reversed__"] is not None:
+                        return True
+                    break
+        return NotImplemented
 
 
 class Generator(Iterator):
@@ -670,7 +689,7 @@ class ItemsView(MappingView, Set):
         except KeyError:
             return False
         else:
-            return v == value
+            return v is value or v == value
 
     def __iter__(self):
         for key in self._mapping:
@@ -685,7 +704,8 @@ class ValuesView(MappingView):
 
     def __contains__(self, value):
         for key in self._mapping:
-            if value == self._mapping[key]:
+            v = self._mapping[key]
+            if v is value or v == value:
                 return True
         return False
 
@@ -794,7 +814,7 @@ MutableMapping.register(dict)
 ### SEQUENCES ###
 
 
-class Sequence(Sized, Iterable, Container):
+class Sequence(Sized, Reversible, Container):
 
     """All the operations on a read-only sequence.
 
@@ -820,7 +840,7 @@ class Sequence(Sized, Iterable, Container):
 
     def __contains__(self, value):
         for v in self:
-            if v == value:
+            if v is value or v == value:
                 return True
         return False
 

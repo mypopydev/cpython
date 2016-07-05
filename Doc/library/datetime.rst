@@ -3,11 +3,14 @@
 
 .. module:: datetime
    :synopsis: Basic date and time types.
+
 .. moduleauthor:: Tim Peters <tim@zope.com>
 .. sectionauthor:: Tim Peters <tim@zope.com>
 .. sectionauthor:: A.M. Kuchling <amk@amk.ca>
 
 **Source code:** :source:`Lib/datetime.py`
+
+--------------
 
 .. XXX what order should the types be discussed in?
 
@@ -562,7 +565,7 @@ Instance methods:
    Return a 3-tuple, (ISO year, ISO week number, ISO weekday).
 
    The ISO calendar is a widely used variant of the Gregorian calendar. See
-   http://www.staff.science.uu.nl/~gent0113/calendar/isocalendar.htm for a good
+   https://www.staff.science.uu.nl/~gent0113/calendar/isocalendar.htm for a good
    explanation.
 
    The ISO year consists of 52 or 53 full weeks, and where a week starts on a
@@ -1466,9 +1469,9 @@ Instance methods:
 
 
       >>> from datetime import time
-      >>> time(hours=12, minute=34, second=56, microsecond=123456).isoformat(timespec='minutes')
+      >>> time(hour=12, minute=34, second=56, microsecond=123456).isoformat(timespec='minutes')
       '12:34'
-      >>> dt = time(hours=12, minute=34, second=56, microsecond=0)
+      >>> dt = time(hour=12, minute=34, second=56, microsecond=0)
       >>> dt.isoformat(timespec='microseconds')
       '12:34:56.000000'
       >>> dt.isoformat(timespec='auto')
@@ -1775,7 +1778,7 @@ only EST (fixed offset -5 hours), or only EDT (fixed offset -4 hours)).
       *pytz* library brings the *IANA timezone database* (also known as the
       Olson database) to Python and its usage is recommended.
 
-   `IANA timezone database <http://www.iana.org/time-zones>`_
+   `IANA timezone database <https://www.iana.org/time-zones>`_
       The Time Zone Database (often called tz or zoneinfo) contains code and
       data that represent the history of local time for many representative
       locations around the globe. It is updated periodically to reflect changes
@@ -1941,7 +1944,7 @@ format codes.
 +-----------+--------------------------------+------------------------+-------+
 | ``%z``    | UTC offset in the form +HHMM   | (empty), +0000, -0400, | \(6)  |
 |           | or -HHMM (empty string if the  | +1030                  |       |
-|           | the object is naive).          |                        |       |
+|           | object is naive).              |                        |       |
 +-----------+--------------------------------+------------------------+-------+
 | ``%Z``    | Time zone name (empty string   | (empty), UTC, EST, CST |       |
 |           | if the object is naive).       |                        |       |
@@ -2079,7 +2082,7 @@ Notes:
    Similar to ``%U`` and ``%W``, ``%V`` is only used in calculations when the
    day of the week and the ISO year (``%G``) are specified in a
    :meth:`strptime` format string. Also note that ``%G`` and ``%Y`` are not
-   interchangable.
+   interchangeable.
 
 .. rubric:: Footnotes
 

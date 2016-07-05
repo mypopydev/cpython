@@ -144,7 +144,7 @@ static int import_all_from(PyObject *, PyObject *);
 static void format_exc_check_arg(PyObject *, const char *, PyObject *);
 static void format_exc_unbound(PyCodeObject *co, int oparg);
 static PyObject * unicode_concatenate(PyObject *, PyObject *,
-                                      PyFrameObject *, unsigned char *);
+                                      PyFrameObject *, const unsigned short *);
 static PyObject * special_lookup(PyObject *, _Py_Identifier *);
 
 #define NAME_ERROR_MSG \
@@ -800,7 +800,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     int lastopcode = 0;
 #endif
     PyObject **stack_pointer;  /* Next free slot in value stack */
-    unsigned char *next_instr;
+    const unsigned short *next_instr;
     int opcode;        /* Current opcode */
     int oparg;         /* Current opcode argument, if any */
     enum why_code why; /* Reason for block stack unwind */
@@ -818,7 +818,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
        time it is tested. */
     int instr_ub = -1, instr_lb = 0, instr_prev = -1;
 
-    unsigned char *first_instr;
+    const unsigned short *first_instr;
     PyObject *names;
     PyObject *consts;
 
@@ -886,23 +886,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 /* Import the static jump table */
 #include "opcode_targets.h"
 
-/* This macro is used when several opcodes defer to the same implementation
-   (e.g. SETUP_LOOP, SETUP_FINALLY) */
-#define TARGET_WITH_IMPL(op, impl) \
-    TARGET_##op: \
-        opcode = op; \
-        if (HAS_ARG(op)) \
-            oparg = NEXTARG(); \
-    case op: \
-        goto impl; \
-
 #define TARGET(op) \
     TARGET_##op: \
-        opcode = op; \
-        if (HAS_ARG(op)) \
-            oparg = NEXTARG(); \
     case op:
-
 
 #define DISPATCH() \
     { \
@@ -917,7 +903,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     { \
         if (!lltrace && !_Py_TracingPossible) { \
             f->f_lasti = INSTR_OFFSET(); \
-            goto *opcode_targets[*next_instr++]; \
+            NEXTOPARG(); \
+            goto *opcode_targets[opcode]; \
         } \
         goto fast_next_opcode; \
     }
@@ -926,7 +913,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     { \
         if (!_Py_TracingPossible) { \
             f->f_lasti = INSTR_OFFSET(); \
-            goto *opcode_targets[*next_instr++]; \
+            NEXTOPARG(); \
+            goto *opcode_targets[opcode]; \
         } \
         goto fast_next_opcode; \
     }
@@ -935,10 +923,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #else
 #define TARGET(op) \
     case op:
-#define TARGET_WITH_IMPL(op, impl) \
-    /* silence compiler warnings about `impl` unused */ \
-    if (0) goto impl; \
-    case op:
+
 #define DISPATCH() continue
 #define FAST_DISPATCH() goto fast_next_opcode
 #endif
@@ -994,28 +979,38 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 /* Code access macros */
 
-#define INSTR_OFFSET()  ((int)(next_instr - first_instr))
-#define NEXTOP()        (*next_instr++)
-#define NEXTARG()       (next_instr += 2, (next_instr[-1]<<8) + next_instr[-2])
-#define PEEKARG()       ((next_instr[2]<<8) + next_instr[1])
-#define JUMPTO(x)       (next_instr = first_instr + (x))
-#define JUMPBY(x)       (next_instr += (x))
+#ifdef WORDS_BIGENDIAN
+    #define OPCODE(word) ((word) >> 8)
+    #define OPARG(word) ((word) & 255)
+#else
+    #define OPCODE(word) ((word) & 255)
+    #define OPARG(word) ((word) >> 8)
+#endif
+/* The integer overflow is checked by an assertion below. */
+#define INSTR_OFFSET()  (2*(int)(next_instr - first_instr))
+#define NEXTOPARG()  do { \
+        unsigned short word = *next_instr; \
+        opcode = OPCODE(word); \
+        oparg = OPARG(word); \
+        next_instr++; \
+    } while (0)
+#define JUMPTO(x)       (next_instr = first_instr + (x)/2)
+#define JUMPBY(x)       (next_instr += (x)/2)
 
 /* OpCode prediction macros
     Some opcodes tend to come in pairs thus making it possible to
     predict the second code when the first is run.  For example,
-    COMPARE_OP is often followed by JUMP_IF_FALSE or JUMP_IF_TRUE.  And,
-    those opcodes are often followed by a POP_TOP.
+    COMPARE_OP is often followed by POP_JUMP_IF_FALSE or POP_JUMP_IF_TRUE.
 
     Verifying the prediction costs a single high-speed test of a register
     variable against a constant.  If the pairing was good, then the
     processor's own internal branch predication has a high likelihood of
     success, resulting in a nearly zero-overhead transition to the
     next opcode.  A successful prediction saves a trip through the eval-loop
-    including its two unpredictable branches, the HAS_ARG test and the
-    switch-case.  Combined with the processor's internal branch prediction,
-    a successful PREDICT has the effect of making the two opcodes run as if
-    they were a single new opcode with the bodies combined.
+    including its unpredictable switch-case branch.  Combined with the
+    processor's internal branch prediction, a successful PREDICT has the
+    effect of making the two opcodes run as if they were a single new opcode
+    with the bodies combined.
 
     If collecting opcode statistics, your choices are to either keep the
     predictions turned-on and interpret the results as if some opcodes
@@ -1030,13 +1025,19 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 #if defined(DYNAMIC_EXECUTION_PROFILE) || USE_COMPUTED_GOTOS
 #define PREDICT(op)             if (0) goto PRED_##op
-#define PREDICTED(op)           PRED_##op:
-#define PREDICTED_WITH_ARG(op)  PRED_##op:
 #else
-#define PREDICT(op)             if (*next_instr == op) goto PRED_##op
-#define PREDICTED(op)           PRED_##op: next_instr++
-#define PREDICTED_WITH_ARG(op)  PRED_##op: oparg = PEEKARG(); next_instr += 3
+#define PREDICT(op) \
+    do{ \
+        unsigned short word = *next_instr; \
+        opcode = OPCODE(word); \
+        if (opcode == op){ \
+            oparg = OPARG(word); \
+            next_instr++; \
+            goto PRED_##op; \
+        } \
+    } while(0)
 #endif
+#define PREDICTED(op)           PRED_##op:
 
 
 /* Stack manipulation macros */
@@ -1100,7 +1101,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     }
 
 #define UNWIND_EXCEPT_HANDLER(b) \
-    { \
+    do { \
         PyObject *type, *value, *traceback; \
         assert(STACK_LEVEL() >= (b)->b_level + 3); \
         while (STACK_LEVEL() > (b)->b_level + 3) { \
@@ -1116,7 +1117,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         Py_XDECREF(type); \
         Py_XDECREF(value); \
         Py_XDECREF(traceback); \
-    }
+    } while(0)
 
 /* Start of code */
 
@@ -1165,16 +1166,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     consts = co->co_consts;
     fastlocals = f->f_localsplus;
     freevars = f->f_localsplus + co->co_nlocals;
-    first_instr = (unsigned char*) PyBytes_AS_STRING(co->co_code);
-    /* An explanation is in order for the next line.
+    assert(PyBytes_Check(co->co_code));
+    assert(PyBytes_GET_SIZE(co->co_code) <= INT_MAX);
+    assert(PyBytes_GET_SIZE(co->co_code) % 2 == 0);
+    assert(_Py_IS_ALIGNED(PyBytes_AS_STRING(co->co_code), 2));
+    first_instr = (unsigned short*) PyBytes_AS_STRING(co->co_code);
+    /*
+       f->f_lasti refers to the index of the last instruction,
+       unless it's -1 in which case next_instr should be first_instr.
 
-       f->f_lasti now refers to the index of the last instruction
-       executed.  You might think this was obvious from the name, but
-       this wasn't always true before 2.3!  PyFrame_New now sets
-       f->f_lasti to -1 (i.e. the index *before* the first instruction)
-       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
-       does work.  Promise.
-       YIELD_FROM sets f_lasti to itself, in order to repeated yield
+       YIELD_FROM sets f_lasti to itself, in order to repeatedly yield
        multiple values.
 
        When the PREDICT() macros are enabled, some opcode pairs follow in
@@ -1183,9 +1184,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
        were a single new opcode; accordingly,f->f_lasti will point to
        the first code in the pair (for instance, GET_ITER followed by
        FOR_ITER is effectively a single opcode and f->f_lasti will point
-       at to the beginning of the combined pair.)
+       to the beginning of the combined pair.)
     */
-    next_instr = first_instr + f->f_lasti + 1;
+    next_instr = first_instr;
+    if (f->f_lasti >= 0) {
+        assert(f->f_lasti % 2 == 0);
+        next_instr += f->f_lasti/2 + 1;
+    }
     stack_pointer = f->f_stacktop;
     assert(stack_pointer != NULL);
     f->f_stacktop = NULL;       /* remains NULL unless yield suspends frame */
@@ -1249,7 +1254,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
            Py_MakePendingCalls() above. */
 
         if (_Py_atomic_load_relaxed(&eval_breaker)) {
-            if (*next_instr == SETUP_FINALLY) {
+            if (OPCODE(*next_instr) == SETUP_FINALLY) {
                 /* Make the last opcode before
                    a try: finally: block uninterruptible. */
                 goto fast_next_opcode;
@@ -1322,11 +1327,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
         /* Extract opcode and argument */
 
-        opcode = NEXTOP();
-        oparg = 0;   /* allows oparg to be stored in a register because
-            it doesn't have to be remembered across a full loop */
-        if (HAS_ARG(opcode))
-            oparg = NEXTARG();
+        NEXTOPARG();
     dispatch_opcode:
 #ifdef DYNAMIC_EXECUTION_PROFILE
 #ifdef DXPAIRS
@@ -1377,6 +1378,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             FAST_DISPATCH();
         }
 
+        PREDICTED(LOAD_CONST);
         TARGET(LOAD_CONST) {
             PyObject *value = GETITEM(consts, oparg);
             Py_INCREF(value);
@@ -1384,7 +1386,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             FAST_DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(STORE_FAST);
+        PREDICTED(STORE_FAST);
         TARGET(STORE_FAST) {
             PyObject *value = POP();
             SETLOCAL(oparg, value);
@@ -1933,8 +1935,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             PyObject *obj = TOP();
             PyTypeObject *type = Py_TYPE(obj);
 
-            if (type->tp_as_async != NULL)
+            if (type->tp_as_async != NULL) {
                 getter = type->tp_as_async->am_aiter;
+            }
 
             if (getter != NULL) {
                 iter = (*getter)(obj);
@@ -1955,6 +1958,27 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
+            if (Py_TYPE(iter)->tp_as_async != NULL &&
+                    Py_TYPE(iter)->tp_as_async->am_anext != NULL) {
+
+                /* Starting with CPython 3.5.2 __aiter__ should return
+                   asynchronous iterators directly (not awaitables that
+                   resolve to asynchronous iterators.)
+
+                   Therefore, we check if the object that was returned
+                   from __aiter__ has an __anext__ method.  If it does,
+                   we wrap it in an awaitable that resolves to `iter`.
+
+                   See http://bugs.python.org/issue27243 for more
+                   details.
+                */
+
+                PyObject *wrapper = _PyAIterWrapper_New(iter);
+                Py_DECREF(iter);
+                SET_TOP(wrapper);
+                DISPATCH();
+            }
+
             awaitable = _PyCoro_GetAwaitableIter(iter);
             if (awaitable == NULL) {
                 SET_TOP(NULL);
@@ -1966,10 +1990,25 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
                 Py_DECREF(iter);
                 goto error;
-            } else
+            } else {
                 Py_DECREF(iter);
 
+                if (PyErr_WarnFormat(
+                        PyExc_PendingDeprecationWarning, 1,
+                        "'%.100s' implements legacy __aiter__ protocol; "
+                        "__aiter__ should return an asynchronous "
+                        "iterator, not awaitable",
+                        type->tp_name))
+                {
+                    /* Warning was converted to an error. */
+                    Py_DECREF(awaitable);
+                    SET_TOP(NULL);
+                    goto error;
+                }
+            }
+
             SET_TOP(awaitable);
+            PREDICT(LOAD_CONST);
             DISPATCH();
         }
 
@@ -2012,9 +2051,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 Py_DECREF(next_iter);
 
             PUSH(awaitable);
+            PREDICT(LOAD_CONST);
             DISPATCH();
         }
 
+        PREDICTED(GET_AWAITABLE);
         TARGET(GET_AWAITABLE) {
             PyObject *iterable = TOP();
             PyObject *iter = _PyCoro_GetAwaitableIter(iterable);
@@ -2042,6 +2083,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 goto error;
             }
 
+            PREDICT(LOAD_CONST);
             DISPATCH();
         }
 
@@ -2075,7 +2117,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             f->f_stacktop = stack_pointer;
             why = WHY_YIELD;
             /* and repeat... */
-            f->f_lasti--;
+            f->f_lasti -= 2;
             goto fast_yield;
         }
 
@@ -2097,6 +2139,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
+        PREDICTED(POP_BLOCK);
         TARGET(POP_BLOCK) {
             PyTryBlock *b = PyFrame_BlockPop(f);
             UNWIND_BLOCK(b);
@@ -2213,7 +2256,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(UNPACK_SEQUENCE);
+        PREDICTED(UNPACK_SEQUENCE);
         TARGET(UNPACK_SEQUENCE) {
             PyObject *seq = POP(), *item, **items;
             if (PyTuple_CheckExact(seq) &&
@@ -2511,9 +2554,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET_WITH_IMPL(BUILD_TUPLE_UNPACK, _build_list_unpack)
-        TARGET(BUILD_LIST_UNPACK)
-        _build_list_unpack: {
+        TARGET(BUILD_TUPLE_UNPACK)
+        TARGET(BUILD_LIST_UNPACK) {
             int convert_to_tuple = opcode == BUILD_TUPLE_UNPACK;
             int i;
             PyObject *sum = PyList_New(0);
@@ -2610,9 +2652,41 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET_WITH_IMPL(BUILD_MAP_UNPACK_WITH_CALL, _build_map_unpack)
-        TARGET(BUILD_MAP_UNPACK)
-        _build_map_unpack: {
+        TARGET(BUILD_CONST_KEY_MAP) {
+            int i;
+            PyObject *map;
+            PyObject *keys = TOP();
+            if (!PyTuple_CheckExact(keys) ||
+                PyTuple_GET_SIZE(keys) != (Py_ssize_t)oparg) {
+                PyErr_SetString(PyExc_SystemError,
+                                "bad BUILD_CONST_KEY_MAP keys argument");
+                goto error;
+            }
+            map = _PyDict_NewPresized((Py_ssize_t)oparg);
+            if (map == NULL) {
+                goto error;
+            }
+            for (i = oparg; i > 0; i--) {
+                int err;
+                PyObject *key = PyTuple_GET_ITEM(keys, oparg - i);
+                PyObject *value = PEEK(i + 1);
+                err = PyDict_SetItem(map, key, value);
+                if (err != 0) {
+                    Py_DECREF(map);
+                    goto error;
+                }
+            }
+
+            Py_DECREF(POP());
+            while (oparg--) {
+                Py_DECREF(POP());
+            }
+            PUSH(map);
+            DISPATCH();
+        }
+
+        TARGET(BUILD_MAP_UNPACK_WITH_CALL)
+        TARGET(BUILD_MAP_UNPACK) {
             int with_call = opcode == BUILD_MAP_UNPACK_WITH_CALL;
             int num_maps;
             int function_location;
@@ -2746,21 +2820,13 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             Py_INCREF(func);
             from = POP();
             level = TOP();
-            if (PyLong_AsLong(level) != -1 || PyErr_Occurred())
-                args = PyTuple_Pack(5,
+            args = PyTuple_Pack(5,
                             name,
                             f->f_globals,
                             f->f_locals == NULL ?
                                   Py_None : f->f_locals,
                             from,
                             level);
-            else
-                args = PyTuple_Pack(4,
-                            name,
-                            f->f_globals,
-                            f->f_locals == NULL ?
-                                  Py_None : f->f_locals,
-                            from);
             Py_DECREF(level);
             Py_DECREF(from);
             if (args == NULL) {
@@ -2819,7 +2885,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             FAST_DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(POP_JUMP_IF_FALSE);
+        PREDICTED(POP_JUMP_IF_FALSE);
         TARGET(POP_JUMP_IF_FALSE) {
             PyObject *cond = POP();
             int err;
@@ -2843,7 +2909,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(POP_JUMP_IF_TRUE);
+        PREDICTED(POP_JUMP_IF_TRUE);
         TARGET(POP_JUMP_IF_TRUE) {
             PyObject *cond = POP();
             int err;
@@ -2920,7 +2986,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(JUMP_ABSOLUTE);
+        PREDICTED(JUMP_ABSOLUTE);
         TARGET(JUMP_ABSOLUTE) {
             JUMPTO(oparg);
 #if FAST_LOOPS
@@ -2946,6 +3012,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (iter == NULL)
                 goto error;
             PREDICT(FOR_ITER);
+            PREDICT(CALL_FUNCTION);
             DISPATCH();
         }
 
@@ -2974,10 +3041,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 if (iter == NULL)
                     goto error;
             }
+            PREDICT(LOAD_CONST);
             DISPATCH();
         }
 
-        PREDICTED_WITH_ARG(FOR_ITER);
+        PREDICTED(FOR_ITER);
         TARGET(FOR_ITER) {
             /* before: [iter]; after: [iter, iter()] *or* [] */
             PyObject *iter = TOP();
@@ -2999,6 +3067,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             STACKADJ(-1);
             Py_DECREF(iter);
             JUMPBY(oparg);
+            PREDICT(POP_BLOCK);
             DISPATCH();
         }
 
@@ -3015,10 +3084,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
         }
 
-        TARGET_WITH_IMPL(SETUP_LOOP, _setup_finally)
-        TARGET_WITH_IMPL(SETUP_EXCEPT, _setup_finally)
-        TARGET(SETUP_FINALLY)
-        _setup_finally: {
+        TARGET(SETUP_LOOP)
+        TARGET(SETUP_EXCEPT)
+        TARGET(SETUP_FINALLY) {
             /* NOTE: If you add any new block-setup opcodes that
                are not try/except/finally handlers, you may need
                to update the PyGen_NeedsFinalizing() function.
@@ -3049,6 +3117,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             if (res == NULL)
                 goto error;
             PUSH(res);
+            PREDICT(GET_AWAITABLE);
             DISPATCH();
         }
 
@@ -3197,6 +3266,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
+        PREDICTED(CALL_FUNCTION);
         TARGET(CALL_FUNCTION) {
             PyObject **sp, *res;
             PCALL(PCALL_ALL);
@@ -3213,10 +3283,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET_WITH_IMPL(CALL_FUNCTION_VAR, _call_function_var_kw)
-        TARGET_WITH_IMPL(CALL_FUNCTION_KW, _call_function_var_kw)
-        TARGET(CALL_FUNCTION_VAR_KW)
-        _call_function_var_kw: {
+        TARGET(CALL_FUNCTION_VAR)
+        TARGET(CALL_FUNCTION_KW)
+        TARGET(CALL_FUNCTION_VAR_KW) {
             int na = oparg & 0xff;
             int nk = (oparg>>8) & 0xff;
             int flags = (opcode - CALL_FUNCTION) & 3;
@@ -3258,115 +3327,36 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             DISPATCH();
         }
 
-        TARGET_WITH_IMPL(MAKE_CLOSURE, _make_function)
-        TARGET(MAKE_FUNCTION)
-        _make_function: {
-            int posdefaults = oparg & 0xff;
-            int kwdefaults = (oparg>>8) & 0xff;
-            int num_annotations = (oparg >> 16) & 0x7fff;
+        TARGET(MAKE_FUNCTION) {
+            PyObject *qualname = POP();
+            PyObject *codeobj = POP();
+            PyFunctionObject *func = (PyFunctionObject *)
+                PyFunction_NewWithQualName(codeobj, f->f_globals, qualname);
 
-            PyObject *qualname = POP(); /* qualname */
-            PyObject *code = POP(); /* code object */
-            PyObject *func = PyFunction_NewWithQualName(code, f->f_globals, qualname);
-            Py_DECREF(code);
+            Py_DECREF(codeobj);
             Py_DECREF(qualname);
-
-            if (func == NULL)
+            if (func == NULL) {
                 goto error;
-
-            if (opcode == MAKE_CLOSURE) {
-                PyObject *closure = POP();
-                if (PyFunction_SetClosure(func, closure) != 0) {
-                    /* Can't happen unless bytecode is corrupt. */
-                    Py_DECREF(func);
-                    Py_DECREF(closure);
-                    goto error;
-                }
-                Py_DECREF(closure);
             }
 
-            if (num_annotations > 0) {
-                Py_ssize_t name_ix;
-                PyObject *names = POP(); /* names of args with annotations */
-                PyObject *anns = PyDict_New();
-                if (anns == NULL) {
-                    Py_DECREF(func);
-                    goto error;
-                }
-                name_ix = PyTuple_Size(names);
-                assert(num_annotations == name_ix+1);
-                while (name_ix > 0) {
-                    PyObject *name, *value;
-                    int err;
-                    --name_ix;
-                    name = PyTuple_GET_ITEM(names, name_ix);
-                    value = POP();
-                    err = PyDict_SetItem(anns, name, value);
-                    Py_DECREF(value);
-                    if (err != 0) {
-                        Py_DECREF(anns);
-                        Py_DECREF(func);
-                        goto error;
-                    }
-                }
-
-                if (PyFunction_SetAnnotations(func, anns) != 0) {
-                    /* Can't happen unless
-                       PyFunction_SetAnnotations changes. */
-                    Py_DECREF(anns);
-                    Py_DECREF(func);
-                    goto error;
-                }
-                Py_DECREF(anns);
-                Py_DECREF(names);
+            if (oparg & 0x08) {
+                assert(PyTuple_CheckExact(TOP()));
+                func ->func_closure = POP();
+            }
+            if (oparg & 0x04) {
+                assert(PyDict_CheckExact(TOP()));
+                func->func_annotations = POP();
+            }
+            if (oparg & 0x02) {
+                assert(PyDict_CheckExact(TOP()));
+                func->func_kwdefaults = POP();
+            }
+            if (oparg & 0x01) {
+                assert(PyTuple_CheckExact(TOP()));
+                func->func_defaults = POP();
             }
 
-            /* XXX Maybe this should be a separate opcode? */
-            if (kwdefaults > 0) {
-                PyObject *defs = PyDict_New();
-                if (defs == NULL) {
-                    Py_DECREF(func);
-                    goto error;
-                }
-                while (--kwdefaults >= 0) {
-                    PyObject *v = POP(); /* default value */
-                    PyObject *key = POP(); /* kw only arg name */
-                    int err = PyDict_SetItem(defs, key, v);
-                    Py_DECREF(v);
-                    Py_DECREF(key);
-                    if (err != 0) {
-                        Py_DECREF(defs);
-                        Py_DECREF(func);
-                        goto error;
-                    }
-                }
-                if (PyFunction_SetKwDefaults(func, defs) != 0) {
-                    /* Can't happen unless
-                       PyFunction_SetKwDefaults changes. */
-                    Py_DECREF(func);
-                    Py_DECREF(defs);
-                    goto error;
-                }
-                Py_DECREF(defs);
-            }
-            if (posdefaults > 0) {
-                PyObject *defs = PyTuple_New(posdefaults);
-                if (defs == NULL) {
-                    Py_DECREF(func);
-                    goto error;
-                }
-                while (--posdefaults >= 0)
-                    PyTuple_SET_ITEM(defs, posdefaults, POP());
-                if (PyFunction_SetDefaults(func, defs) != 0) {
-                    /* Can't happen unless
-                       PyFunction_SetDefaults changes. */
-                    Py_DECREF(defs);
-                    Py_DECREF(func);
-                    goto error;
-                }
-                Py_DECREF(defs);
-            }
-            PUSH(func);
+            PUSH((PyObject *)func);
             DISPATCH();
         }
 
@@ -3447,8 +3437,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
 
         TARGET(EXTENDED_ARG) {
-            opcode = NEXTOP();
-            oparg = oparg<<16 | NEXTARG();
+            int oldoparg = oparg;
+            NEXTOPARG();
+            oparg |= oldoparg << 8;
             goto dispatch_opcode;
         }
 
@@ -4491,7 +4482,7 @@ _PyEval_SetCoroutineWrapper(PyObject *wrapper)
     PyThreadState *tstate = PyThreadState_GET();
 
     Py_XINCREF(wrapper);
-    Py_SETREF(tstate->coroutine_wrapper, wrapper);
+    Py_XSETREF(tstate->coroutine_wrapper, wrapper);
 }
 
 PyObject *
@@ -4890,6 +4881,21 @@ update_star_args(int nstack, int nstar, PyObject *stararg,
 {
     PyObject *callargs, *w;
 
+    if (!nstack) {
+        if (!stararg) {
+            /* There are no positional arguments on the stack and there is no
+               sequence to be unpacked. */
+            return PyTuple_New(0);
+        }
+        if (PyTuple_CheckExact(stararg)) {
+            /* No arguments are passed on the stack and the sequence is not a
+               tuple subclass so we can just pass the stararg tuple directly
+               to the function. */
+            Py_INCREF(stararg);
+            return stararg;
+        }
+    }
+
     callargs = PyTuple_New(nstack + nstar);
     if (callargs == NULL) {
         return NULL;
@@ -4978,7 +4984,7 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 
     if (flags & CALL_FLAG_KW) {
         kwdict = EXT_POP(*pp_stack);
-        if (!PyDict_Check(kwdict)) {
+        if (!PyDict_CheckExact(kwdict)) {
             PyObject *d;
             d = PyDict_New();
             if (d == NULL)
@@ -5288,7 +5294,7 @@ format_exc_unbound(PyCodeObject *co, int oparg)
 
 static PyObject *
 unicode_concatenate(PyObject *v, PyObject *w,
-                    PyFrameObject *f, unsigned char *next_instr)
+                    PyFrameObject *f, const unsigned short *next_instr)
 {
     PyObject *res;
     if (Py_REFCNT(v) == 2) {
@@ -5298,10 +5304,11 @@ unicode_concatenate(PyObject *v, PyObject *w,
          * 'variable'.  We try to delete the variable now to reduce
          * the refcnt to 1.
          */
-        switch (*next_instr) {
+        int opcode, oparg;
+        NEXTOPARG();
+        switch (opcode) {
         case STORE_FAST:
         {
-            int oparg = PEEKARG();
             PyObject **fastlocals = f->f_localsplus;
             if (GETLOCAL(oparg) == v)
                 SETLOCAL(oparg, NULL);
@@ -5311,7 +5318,7 @@ unicode_concatenate(PyObject *v, PyObject *w,
         {
             PyObject **freevars = (f->f_localsplus +
                                    f->f_code->co_nlocals);
-            PyObject *c = freevars[PEEKARG()];
+            PyObject *c = freevars[oparg];
             if (PyCell_GET(c) == v)
                 PyCell_Set(c, NULL);
             break;
@@ -5319,7 +5326,7 @@ unicode_concatenate(PyObject *v, PyObject *w,
         case STORE_NAME:
         {
             PyObject *names = f->f_code->co_names;
-            PyObject *name = GETITEM(names, PEEKARG());
+            PyObject *name = GETITEM(names, oparg);
             PyObject *locals = f->f_locals;
             if (PyDict_CheckExact(locals) &&
                 PyDict_GetItem(locals, name) == v) {

@@ -475,8 +475,8 @@ validate_stmt(stmt_ty stmt)
     case Import_kind:
         return validate_nonempty_seq(stmt->v.Import.names, "names", "Import");
     case ImportFrom_kind:
-        if (stmt->v.ImportFrom.level < -1) {
-            PyErr_SetString(PyExc_ValueError, "ImportFrom level less than -1");
+        if (stmt->v.ImportFrom.level < 0) {
+            PyErr_SetString(PyExc_ValueError, "Negative ImportFrom level");
             return 0;
         }
         return validate_nonempty_seq(stmt->v.ImportFrom.names, "names", "ImportFrom");
@@ -990,13 +990,8 @@ set_context(struct compiling *c, expr_ty e, expr_context_ty ctx, const node *n)
             s = e->v.List.elts;
             break;
         case Tuple_kind:
-            if (asdl_seq_LEN(e->v.Tuple.elts))  {
-                e->v.Tuple.ctx = ctx;
-                s = e->v.Tuple.elts;
-            }
-            else {
-                expr_name = "()";
-            }
+            e->v.Tuple.ctx = ctx;
+            s = e->v.Tuple.elts;
             break;
         case Lambda_kind:
             expr_name = "lambda";

@@ -857,7 +857,7 @@ class WalkTests(unittest.TestCase):
 
     def test_walk_topdown(self):
         # Walk top-down.
-        all = list(os.walk(self.walk_path))
+        all = list(self.walk(self.walk_path))
 
         self.assertEqual(len(all), 4)
         # We can't know which order SUB1 and SUB2 will appear in.
@@ -2824,11 +2824,13 @@ class TestScandir(unittest.TestCase):
 
     def setUp(self):
         self.path = os.path.realpath(support.TESTFN)
+        self.bytes_path = os.fsencode(self.path)
         self.addCleanup(support.rmtree, self.path)
         os.mkdir(self.path)
 
     def create_file(self, name="file.txt"):
-        filename = os.path.join(self.path, name)
+        path = self.bytes_path if isinstance(name, bytes) else self.path
+        filename = os.path.join(path, name)
         create_file(filename, b'python')
         return filename
 
@@ -2852,6 +2854,7 @@ class TestScandir(unittest.TestCase):
             self.assertEqual(stat1, stat2)
 
     def check_entry(self, entry, name, is_dir, is_file, is_symlink):
+        self.assertIsInstance(entry, os.DirEntry)
         self.assertEqual(entry.name, name)
         self.assertEqual(entry.path, os.path.join(self.path, name))
         self.assertEqual(entry.inode(),
@@ -2917,15 +2920,16 @@ class TestScandir(unittest.TestCase):
             self.check_entry(entry, 'symlink_file.txt', False, True, True)
 
     def get_entry(self, name):
-        entries = list(os.scandir(self.path))
+        path = self.bytes_path if isinstance(name, bytes) else self.path
+        entries = list(os.scandir(path))
         self.assertEqual(len(entries), 1)
 
         entry = entries[0]
         self.assertEqual(entry.name, name)
         return entry
 
-    def create_file_entry(self):
-        filename = self.create_file()
+    def create_file_entry(self, name='file.txt'):
+        filename = self.create_file(name=name)
         return self.get_entry(os.path.basename(filename))
 
     def test_current_directory(self):
@@ -2945,6 +2949,19 @@ class TestScandir(unittest.TestCase):
     def test_repr(self):
         entry = self.create_file_entry()
         self.assertEqual(repr(entry), "<DirEntry 'file.txt'>")
+
+    def test_fspath_protocol(self):
+        entry = self.create_file_entry()
+        self.assertEqual(os.fspath(entry), os.path.join(self.path, 'file.txt'))
+
+    @unittest.skipIf(os.name == "nt", "test requires bytes path support")
+    def test_fspath_protocol_bytes(self):
+        bytes_filename = os.fsencode('bytesfile.txt')
+        bytes_entry = self.create_file_entry(name=bytes_filename)
+        fspath = os.fspath(bytes_entry)
+        self.assertIsInstance(fspath, bytes)
+        self.assertEqual(fspath,
+                         os.path.join(os.fsencode(self.path),bytes_filename))
 
     def test_removed_dir(self):
         path = os.path.join(self.path, 'dir')
@@ -3093,6 +3110,62 @@ class TestScandir(unittest.TestCase):
         list(iterator)
         with self.check_no_resource_warning():
             del iterator
+
+
+class TestPEP519(unittest.TestCase):
+
+    # Abstracted so it can be overridden to test pure Python implementation
+    # if a C version is provided.
+    fspath = staticmethod(os.fspath)
+
+    class PathLike:
+        def __init__(self, path=''):
+            self.path = path
+        def __fspath__(self):
+            return self.path
+
+    def test_return_bytes(self):
+        for b in b'hello', b'goodbye', b'some/path/and/file':
+            self.assertEqual(b, self.fspath(b))
+
+    def test_return_string(self):
+        for s in 'hello', 'goodbye', 'some/path/and/file':
+            self.assertEqual(s, self.fspath(s))
+
+    def test_fsencode_fsdecode(self):
+        for p in "path/like/object", b"path/like/object":
+            pathlike = self.PathLike(p)
+
+            self.assertEqual(p, self.fspath(pathlike))
+            self.assertEqual(b"path/like/object", os.fsencode(pathlike))
+            self.assertEqual("path/like/object", os.fsdecode(pathlike))
+
+    def test_pathlike(self):
+        self.assertEqual('#feelthegil', self.fspath(self.PathLike('#feelthegil')))
+        self.assertTrue(issubclass(self.PathLike, os.PathLike))
+        self.assertTrue(isinstance(self.PathLike(), os.PathLike))
+
+        with self.assertRaises(TypeError):
+            self.fspath(self.PathLike(42))
+
+    def test_garbage_in_exception_out(self):
+        vapor = type('blah', (), {})
+        for o in int, type, os, vapor():
+            self.assertRaises(TypeError, self.fspath, o)
+
+    def test_argument_required(self):
+        with self.assertRaises(TypeError):
+            self.fspath()
+
+
+# Only test if the C version is provided, otherwise TestPEP519 already tested
+# the pure Python implementation.
+if hasattr(os, "_fspath"):
+    class TestPEP519PurePython(TestPEP519):
+
+        """Explicitly test the pure Python implementation of os.fspath()."""
+
+        fspath = staticmethod(os._fspath)
 
 
 if __name__ == "__main__":

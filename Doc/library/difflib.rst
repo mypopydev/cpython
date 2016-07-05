@@ -3,6 +3,7 @@
 
 .. module:: difflib
    :synopsis: Helpers for computing differences between objects.
+
 .. moduleauthor:: Tim Peters <tim_one@users.sourceforge.net>
 .. sectionauthor:: Tim Peters <tim_one@users.sourceforge.net>
 .. Markup by Fred L. Drake, Jr. <fdrake@acm.org>
@@ -13,6 +14,8 @@
 
    import sys
    from difflib import *
+
+--------------
 
 This module provides classes and functions for comparing sequences. It
 can be used for example, for comparing files, and can produce difference
@@ -613,7 +616,7 @@ If you want to know how to change the first sequence into the second, use
      work.
 
    * `Simple version control recipe
-     <http://code.activestate.com/recipes/576729/>`_ for a small application
+     <https://code.activestate.com/recipes/576729/>`_ for a small application
      built with :class:`SequenceMatcher`.
 
 

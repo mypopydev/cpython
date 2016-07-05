@@ -255,8 +255,8 @@ class HeaderTests(TestCase):
         self.assertIn(b'\xa0NonbreakSpace: value', conn._buffer)
 
     def test_ipv6host_header(self):
-        # Default host header on IPv6 transaction should wrapped by [] if
-        # its actual IPv6 address
+        # Default host header on IPv6 transaction should be wrapped by [] if
+        # it is an IPv6 address
         expected = b'GET /foo HTTP/1.1\r\nHost: [2001::]:81\r\n' \
                    b'Accept-Encoding: identity\r\n\r\n'
         conn = client.HTTPConnection('[2001::]:81')
@@ -914,6 +914,47 @@ class BasicTest(TestCase):
         # the file should now have our extradata ready to be read
         self.assertEqual(sock.file.read(), extradata) #we read to the end
         resp.close()
+
+    def test_response_fileno(self):
+        # Make sure fd returned by fileno is valid.
+        threading = support.import_module("threading")
+
+        serv = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+        self.addCleanup(serv.close)
+        serv.bind((HOST, 0))
+        serv.listen()
+
+        result = None
+        def run_server():
+            [conn, address] = serv.accept()
+            with conn, conn.makefile("rb") as reader:
+                # Read the request header until a blank line
+                while True:
+                    line = reader.readline()
+                    if not line.rstrip(b"\r\n"):
+                        break
+                conn.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                nonlocal result
+                result = reader.read()
+
+        thread = threading.Thread(target=run_server)
+        thread.start()
+        conn = client.HTTPConnection(*serv.getsockname())
+        conn.request("CONNECT", "dummy:1234")
+        response = conn.getresponse()
+        try:
+            self.assertEqual(response.status, client.OK)
+            s = socket.socket(fileno=response.fileno())
+            try:
+                s.sendall(b"proxied data\n")
+            finally:
+                s.detach()
+        finally:
+            response.close()
+            conn.close()
+            thread.join()
+        self.assertEqual(result, b"proxied data\n")
 
 class ExtendedReadTest(TestCase):
     """

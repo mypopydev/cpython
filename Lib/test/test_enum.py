@@ -254,6 +254,19 @@ class TestEnum(unittest.TestCase):
         with self.assertRaises(AttributeError):
             del Season.SPRING.name
 
+    def test_bool_of_class(self):
+        class Empty(Enum):
+            pass
+        self.assertTrue(bool(Empty))
+
+    def test_bool_of_member(self):
+        class Count(Enum):
+            zero = 0
+            one = 1
+            two = 2
+        for member in Count:
+            self.assertTrue(bool(member))
+
     def test_invalid_names(self):
         with self.assertRaises(ValueError):
             class Wrong(Enum):
@@ -550,6 +563,18 @@ class TestEnum(unittest.TestCase):
         self.assertEqual(WeekDay(3).name, 'TUESDAY')
         self.assertEqual([k for k,v in WeekDay.__members__.items()
                 if v.name != k], ['TEUSDAY', ])
+
+    def test_intenum_from_bytes(self):
+        self.assertIs(IntStooges.from_bytes(b'\x00\x03', 'big'), IntStooges.MOE)
+        with self.assertRaises(ValueError):
+            IntStooges.from_bytes(b'\x00\x05', 'big')
+
+    def test_floatenum_fromhex(self):
+        h = float.hex(FloatStooges.MOE.value)
+        self.assertIs(FloatStooges.fromhex(h), FloatStooges.MOE)
+        h = float.hex(FloatStooges.MOE.value + 0.01)
+        with self.assertRaises(ValueError):
+            FloatStooges.fromhex(h)
 
     def test_pickle_enum(self):
         if isinstance(Stooges, Exception):
@@ -1578,6 +1603,19 @@ class TestUnique(unittest.TestCase):
                 triple = 3
                 turkey = 3
 
+    def test_unique_with_name(self):
+        @unique
+        class Silly(Enum):
+            one = 1
+            two = 'dos'
+            name = 3
+        @unique
+        class Sillier(IntEnum):
+            single = 1
+            name = 2
+            triple = 3
+            value = 4
+
 
 expected_help_output_with_docs = """\
 Help on class Color in module %s:
@@ -1728,6 +1766,42 @@ class TestStdLib(unittest.TestCase):
 class MiscTestCase(unittest.TestCase):
     def test__all__(self):
         support.check__all__(self, enum)
+
+
+# These are unordered here on purpose to ensure that declaration order
+# makes no difference.
+CONVERT_TEST_NAME_D = 5
+CONVERT_TEST_NAME_C = 5
+CONVERT_TEST_NAME_B = 5
+CONVERT_TEST_NAME_A = 5  # This one should sort first.
+CONVERT_TEST_NAME_E = 5
+CONVERT_TEST_NAME_F = 5
+
+class TestIntEnumConvert(unittest.TestCase):
+    def test_convert_value_lookup_priority(self):
+        test_type = enum.IntEnum._convert(
+                'UnittestConvert', 'test.test_enum',
+                filter=lambda x: x.startswith('CONVERT_TEST_'))
+        # We don't want the reverse lookup value to vary when there are
+        # multiple possible names for a given value.  It should always
+        # report the first lexigraphical name in that case.
+        self.assertEqual(test_type(5).name, 'CONVERT_TEST_NAME_A')
+
+    def test_convert(self):
+        test_type = enum.IntEnum._convert(
+                'UnittestConvert', 'test.test_enum',
+                filter=lambda x: x.startswith('CONVERT_TEST_'))
+        # Ensure that test_type has all of the desired names and values.
+        self.assertEqual(test_type.CONVERT_TEST_NAME_F,
+                         test_type.CONVERT_TEST_NAME_A)
+        self.assertEqual(test_type.CONVERT_TEST_NAME_B, 5)
+        self.assertEqual(test_type.CONVERT_TEST_NAME_C, 5)
+        self.assertEqual(test_type.CONVERT_TEST_NAME_D, 5)
+        self.assertEqual(test_type.CONVERT_TEST_NAME_E, 5)
+        # Ensure that test_type only picked up names matching the filter.
+        self.assertEqual([name for name in dir(test_type)
+                          if name[0:2] not in ('CO', '__')],
+                         [], msg='Names other than CONVERT_TEST_* found.')
 
 
 if __name__ == '__main__':

@@ -130,10 +130,6 @@ _code_type = type(_write_atomic.__code__)
 # a .pyc file in text mode the magic number will be wrong; also, the
 # Apple MPW compiler swaps their values, botching string constants.
 #
-# The magic numbers must be spaced apart at least 2 values, as the
-# -U interpeter flag will cause MAGIC+1 being used. They have been
-# odd numbers for some time now.
-#
 # There were a variety of old schemes for setting the magic number.
 # The current working scheme is to increment the previous value by
 # 10.
@@ -223,14 +219,22 @@ _code_type = type(_write_atomic.__code__)
 #     Python 3.5b1  3330 (PEP 448: Additional Unpacking Generalizations)
 #     Python 3.5b2  3340 (fix dictionary display evaluation order #11205)
 #     Python 3.5b2  3350 (add GET_YIELD_FROM_ITER opcode #24400)
+#     Python 3.5.2  3351 (fix BUILD_MAP_UNPACK_WITH_CALL opcode #27286)
 #     Python 3.6a0  3360 (add FORMAT_VALUE opcode #25483
 #     Python 3.6a0  3361 (lineno delta of code.co_lnotab becomes signed)
+#     Python 3.6a1  3370 (16 bit wordcode)
+#     Python 3.6a1  3371 (add BUILD_CONST_KEY_MAP opcode #27140)
+#     Python 3.6a1  3372 (MAKE_FUNCTION simplification, remove MAKE_CLOSURE
+                          #27095)
 #
 # MAGIC must change whenever the bytecode emitted by the compiler may no
 # longer be understood by older implementations of the eval loop (usually
 # due to the addition of new opcodes).
+#
+# Whenever MAGIC_NUMBER is changed, the ranges in the magic_values array
+# in PC/launcher.c must also be updated.
 
-MAGIC_NUMBER = (3361).to_bytes(2, 'little') + b'\r\n'
+MAGIC_NUMBER = (3372).to_bytes(2, 'little') + b'\r\n'
 _RAW_MAGIC_NUMBER = int.from_bytes(MAGIC_NUMBER, 'little')  # For import.c
 
 _PYCACHE = '__pycache__'
@@ -1211,8 +1215,8 @@ class FileFinder:
                                        submodule_search_locations=smsl)
 
     def find_spec(self, fullname, target=None):
-        """Try to find a loader for the specified module, or the namespace
-        package portions. Returns (loader, list-of-portions)."""
+        """Try to find a spec for the specified module.  Returns the
+        matching spec, or None if not found."""
         is_namespace = False
         tail_module = fullname.rpartition('.')[2]
         try:

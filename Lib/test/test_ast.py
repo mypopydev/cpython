@@ -548,6 +548,17 @@ class ASTHelpers_Test(unittest.TestCase):
             compile(mod, 'test', 'exec')
         self.assertIn("invalid integer value: None", str(cm.exception))
 
+    def test_level_as_none(self):
+        body = [ast.ImportFrom(module='time',
+                               names=[ast.alias(name='sleep')],
+                               level=None,
+                               lineno=0, col_offset=0)]
+        mod = ast.Module(body)
+        code = compile(mod, 'test', 'exec')
+        ns = {}
+        exec(code, ns)
+        self.assertIn('sleep', ns)
+
 
 class ASTValidatorTests(unittest.TestCase):
 
@@ -743,7 +754,7 @@ class ASTValidatorTests(unittest.TestCase):
 
     def test_importfrom(self):
         imp = ast.ImportFrom(None, [ast.alias("x", None)], -42)
-        self.stmt(imp, "level less than -1")
+        self.stmt(imp, "Negative ImportFrom level")
         self.stmt(ast.ImportFrom(None, [], 0), "empty names on ImportFrom")
 
     def test_global(self):

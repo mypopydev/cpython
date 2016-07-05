@@ -3,6 +3,7 @@
 
 .. module:: heapq
    :synopsis: Heap queue algorithm (a.k.a. priority queue).
+
 .. moduleauthor:: Kevin O'Connor
 .. sectionauthor:: Guido van Rossum <guido@python.org>
 .. sectionauthor:: François Pinard
@@ -242,7 +243,7 @@ for a tournament.  The numbers below are *k*, not ``a[k]``::
 
    15 16   17 18   19 20   21 22   23 24   25 26   27 28   29 30
 
-In the tree above, each cell *k* is topping ``2*k+1`` and ``2*k+2``. In an usual
+In the tree above, each cell *k* is topping ``2*k+1`` and ``2*k+2``. In a usual
 binary tournament we see in sports, each cell is the winner over the two cells
 it tops, and we can trace the winner down the tree to see all opponents s/he
 had.  However, in many computer applications of such tournaments, we do not need

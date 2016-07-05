@@ -101,8 +101,9 @@ keywords to your callback, use :func:`functools.partial`. For example,
    called after :meth:`call_soon` returns, when control returns to the event
    loop.
 
-   This operates as a FIFO queue, callbacks are called in the order in
-   which they are registered.  Each callback will be called exactly once.
+   This operates as a :abbr:`FIFO (first-in, first-out)` queue, callbacks
+   are called in the order in which they are registered.  Each callback
+   will be called exactly once.
 
    Any positional arguments after the callback will be passed to the
    callback when it is called.
@@ -177,6 +178,20 @@ a different clock than :func:`time.time`.
 .. seealso::
 
    The :func:`asyncio.sleep` function.
+
+
+Futures
+-------
+
+.. method:: BaseEventLoop.create_future()
+
+   Create an :class:`asyncio.Future` object attached to the loop.
+
+   This is a preferred way to create futures in asyncio, as event
+   loop implementations can provide alternative implementations
+   of the Future class (with better performance or instrumentation).
+
+   .. versionadded:: 3.5.2
 
 
 Tasks
@@ -477,7 +492,10 @@ Low-level socket operations
 
 .. coroutinemethod:: BaseEventLoop.sock_recv(sock, nbytes)
 
-   Receive data from the socket.  The return value is a bytes object
+   Receive data from the socket.  Modeled after blocking
+   :meth:`socket.socket.recv` method.
+
+   The return value is a bytes object
    representing the data received.  The maximum amount of data to be received
    at once is specified by *nbytes*.
 
@@ -486,13 +504,12 @@ Low-level socket operations
 
    This method is a :ref:`coroutine <coroutine>`.
 
-   .. seealso::
-
-      The :meth:`socket.socket.recv` method.
-
 .. coroutinemethod:: BaseEventLoop.sock_sendall(sock, data)
 
-   Send data to the socket.  The socket must be connected to a remote socket.
+   Send data to the socket.  Modeled after blocking
+   :meth:`socket.socket.sendall` method.
+
+   The socket must be connected to a remote socket.
    This method continues to send data from *data* until either all data has
    been sent or an error occurs.  ``None`` is returned on success.  On error,
    an exception is raised, and there is no way to determine how much data, if
@@ -503,35 +520,35 @@ Low-level socket operations
 
    This method is a :ref:`coroutine <coroutine>`.
 
-   .. seealso::
-
-      The :meth:`socket.socket.sendall` method.
-
 .. coroutinemethod:: BaseEventLoop.sock_connect(sock, address)
 
-   Connect to a remote socket at *address*.
-
-   The *address* must be already resolved to avoid the trap of hanging the
-   entire event loop when the address requires doing a DNS lookup.  For
-   example, it must be an IP address, not an hostname, for
-   :py:data:`~socket.AF_INET` and :py:data:`~socket.AF_INET6` address families.
-   Use :meth:`getaddrinfo` to resolve the hostname asynchronously.
+   Connect to a remote socket at *address*.  Modeled after
+   blocking :meth:`socket.socket.connect` method.
 
    With :class:`SelectorEventLoop` event loop, the socket *sock* must be
    non-blocking.
 
    This method is a :ref:`coroutine <coroutine>`.
 
+   .. versionchanged:: 3.5.2
+      ``address`` no longer needs to be resolved.  ``sock_connect``
+      will try to check if the *address* is already resolved by calling
+      :func:`socket.inet_pton`.  If not,
+      :meth:`BaseEventLoop.getaddrinfo` will be used to resolve the
+      *address*.
+
    .. seealso::
 
-      The :meth:`BaseEventLoop.create_connection` method, the
-      :func:`open_connection` function and the :meth:`socket.socket.connect`
-      method.
+      :meth:`BaseEventLoop.create_connection`
+      and  :func:`asyncio.open_connection() <open_connection>`.
 
 
 .. coroutinemethod:: BaseEventLoop.sock_accept(sock)
 
-   Accept a connection. The socket must be bound to an address and listening
+   Accept a connection.  Modeled after blocking
+   :meth:`socket.socket.accept`.
+
+   The socket must be bound to an address and listening
    for connections. The return value is a pair ``(conn, address)`` where *conn*
    is a *new* socket object usable to send and receive data on the connection,
    and *address* is the address bound to the socket on the other end of the
@@ -543,8 +560,7 @@ Low-level socket operations
 
    .. seealso::
 
-      The :meth:`BaseEventLoop.create_server` method, the :func:`start_server`
-      function and the :meth:`socket.socket.accept` method.
+      :meth:`BaseEventLoop.create_server` and :func:`start_server`.
 
 
 Resolve host name
@@ -668,6 +684,13 @@ Allows customizing how exceptions are handled in the event loop.
    will be a reference to the active event loop, ``context``
    will be a ``dict`` object (see :meth:`call_exception_handler`
    documentation for details about context).
+
+.. method:: BaseEventLoop.get_exception_handler()
+
+   Return the exception handler, or ``None`` if the default one
+   is in use.
+
+   .. versionadded:: 3.5.2
 
 .. method:: BaseEventLoop.default_exception_handler(context)
 

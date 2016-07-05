@@ -52,11 +52,12 @@ handler class by subclassing the :class:`BaseRequestHandler` class and
 overriding its :meth:`~BaseRequestHandler.handle` method;
 this method will process incoming
 requests.  Second, you must instantiate one of the server classes, passing it
-the server's address and the request handler class.  Then call the
+the server's address and the request handler class. It is recommended to use
+the server in a :keyword:`with` statement. Then call the
 :meth:`~BaseServer.handle_request` or
 :meth:`~BaseServer.serve_forever` method of the server object to
 process one or many requests.  Finally, call :meth:`~BaseServer.server_close`
-to close the socket.
+to close the socket (unless you used a :keyword:`with` statement).
 
 When inheriting from :class:`ThreadingMixIn` for threaded connection behavior,
 you should explicitly declare how you want your threads to behave on an abrupt
@@ -111,6 +112,8 @@ server classes.
    :class:`UDPServer`.  Setting the various attributes also changes the
    behavior of the underlying server mechanism.
 
+   :class:`ForkingMixIn` and the Forking classes mentioned below are
+   only available on POSIX platforms that support :func:`~os.fork`.
 
 .. class:: ForkingTCPServer
            ForkingUDPServer
@@ -353,6 +356,11 @@ Server Objects
       default implementation always returns :const:`True`.
 
 
+   .. versionchanged:: 3.6
+      Support for the :term:`context manager` protocol was added.  Exiting the
+      context manager is equivalent to calling :meth:`server_close`.
+
+
 Request Handler Objects
 -----------------------
 
@@ -401,6 +409,15 @@ Request Handler Objects
    read or written, respectively, to get the request data or return data
    to the client.
 
+   The :attr:`rfile` attributes of both classes support the
+   :class:`io.BufferedIOBase` readable interface, and
+   :attr:`DatagramRequestHandler.wfile` supports the
+   :class:`io.BufferedIOBase` writable interface.
+
+   .. versionchanged:: 3.6
+      :attr:`StreamRequestHandler.wfile` also supports the
+      :class:`io.BufferedIOBase` writable interface.
+
 
 Examples
 --------
@@ -433,11 +450,10 @@ This is the server side::
        HOST, PORT = "localhost", 9999
 
        # Create the server, binding to localhost on port 9999
-       server = socketserver.TCPServer((HOST, PORT), MyTCPHandler)
-
-       # Activate the server; this will keep running until you
-       # interrupt the program with Ctrl-C
-       server.serve_forever()
+       with socketserver.TCPServer((HOST, PORT), MyTCPHandler) as server:
+           # Activate the server; this will keep running until you
+           # interrupt the program with Ctrl-C
+           server.serve_forever()
 
 An alternative request handler class that makes use of streams (file-like
 objects that simplify communication by providing the standard file interface)::
@@ -469,17 +485,13 @@ This is the client side::
    data = " ".join(sys.argv[1:])
 
    # Create a socket (SOCK_STREAM means a TCP socket)
-   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-   try:
+   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
        # Connect to server and send data
        sock.connect((HOST, PORT))
        sock.sendall(bytes(data + "\n", "utf-8"))
 
        # Receive data from the server and shut down
        received = str(sock.recv(1024), "utf-8")
-   finally:
-       sock.close()
 
    print("Sent:     {}".format(data))
    print("Received: {}".format(received))
@@ -529,8 +541,8 @@ This is the server side::
 
    if __name__ == "__main__":
        HOST, PORT = "localhost", 9999
-       server = socketserver.UDPServer((HOST, PORT), MyUDPHandler)
-       server.serve_forever()
+       with socketserver.UDPServer((HOST, PORT), MyUDPHandler) as server:
+           server.serve_forever()
 
 This is the client side::
 
@@ -578,36 +590,33 @@ An example for the :class:`ThreadingMixIn` class::
        pass
 
    def client(ip, port, message):
-       sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-       sock.connect((ip, port))
-       try:
+       with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+           sock.connect((ip, port))
            sock.sendall(bytes(message, 'ascii'))
            response = str(sock.recv(1024), 'ascii')
            print("Received: {}".format(response))
-       finally:
-           sock.close()
 
    if __name__ == "__main__":
        # Port 0 means to select an arbitrary unused port
        HOST, PORT = "localhost", 0
 
        server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
-       ip, port = server.server_address
+       with server:
+           ip, port = server.server_address
 
-       # Start a thread with the server -- that thread will then start one
-       # more thread for each request
-       server_thread = threading.Thread(target=server.serve_forever)
-       # Exit the server thread when the main thread terminates
-       server_thread.daemon = True
-       server_thread.start()
-       print("Server loop running in thread:", server_thread.name)
+           # Start a thread with the server -- that thread will then start one
+           # more thread for each request
+           server_thread = threading.Thread(target=server.serve_forever)
+           # Exit the server thread when the main thread terminates
+           server_thread.daemon = True
+           server_thread.start()
+           print("Server loop running in thread:", server_thread.name)
 
-       client(ip, port, "Hello World 1")
-       client(ip, port, "Hello World 2")
-       client(ip, port, "Hello World 3")
+           client(ip, port, "Hello World 1")
+           client(ip, port, "Hello World 2")
+           client(ip, port, "Hello World 3")
 
-       server.shutdown()
-       server.server_close()
+           server.shutdown()
 
 
 The output of the example should look something like this::
@@ -621,3 +630,5 @@ The output of the example should look something like this::
 
 The :class:`ForkingMixIn` class is used in the same way, except that the server
 will spawn a new process for each request.
+Available only on POSIX platforms that support :func:`~os.fork`.
+

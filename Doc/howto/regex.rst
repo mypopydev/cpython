@@ -374,9 +374,7 @@ module.  If you have :mod:`tkinter` available, you may also want to look at
 :source:`Tools/demo/redemo.py`, a demonstration program included with the
 Python distribution.  It allows you to enter REs and strings, and displays
 whether the RE matches or fails. :file:`redemo.py` can be quite useful when
-trying to debug a complicated RE.  Phil Schwartz's `Kodos
-<http://kodos.sourceforge.net/>`_ is also an interactive tool for developing and
-testing RE patterns.
+trying to debug a complicated RE.
 
 This HOWTO uses the standard Python interpreter for its examples. First, run the
 Python interpreter, import the :mod:`re` module, and compile a RE::
@@ -1115,19 +1113,19 @@ which can be either a string or a function, and the string to be processed.
 Here's a simple example of using the :meth:`sub` method.  It replaces colour
 names with the word ``colour``::
 
-   >>> p = re.compile( '(blue|white|red)')
-   >>> p.sub( 'colour', 'blue socks and red shoes')
+   >>> p = re.compile('(blue|white|red)')
+   >>> p.sub('colour', 'blue socks and red shoes')
    'colour socks and colour shoes'
-   >>> p.sub( 'colour', 'blue socks and red shoes', count=1)
+   >>> p.sub('colour', 'blue socks and red shoes', count=1)
    'colour socks and red shoes'
 
 The :meth:`subn` method does the same work, but returns a 2-tuple containing the
 new string value and the number of replacements  that were performed::
 
-   >>> p = re.compile( '(blue|white|red)')
-   >>> p.subn( 'colour', 'blue socks and red shoes')
+   >>> p = re.compile('(blue|white|red)')
+   >>> p.subn('colour', 'blue socks and red shoes')
    ('colour socks and colour shoes', 2)
-   >>> p.subn( 'colour', 'no colours at all')
+   >>> p.subn('colour', 'no colours at all')
    ('no colours at all', 0)
 
 Empty matches are replaced only when they're not adjacent to a previous match.

@@ -3,6 +3,7 @@
 
 .. module:: imaplib
    :synopsis: IMAP4 protocol client (requires sockets).
+
 .. moduleauthor:: Piers Lauder <piers@communitysolutions.com.au>
 .. sectionauthor:: Piers Lauder <piers@communitysolutions.com.au>
 .. revised by ESR, January 2000
@@ -10,13 +11,12 @@
 .. changes for IMAP4_stream by Piers Lauder <piers@communitysolutions.com.au>,
    November 2002
 
+**Source code:** :source:`Lib/imaplib.py`
 
 .. index::
    pair: IMAP4; protocol
    pair: IMAP4_SSL; protocol
    pair: IMAP4_stream; protocol
-
-**Source code:** :source:`Lib/imaplib.py`
 
 --------------
 
@@ -157,7 +157,7 @@ example of usage.
 
    Documents describing the protocol, and sources and binaries  for servers
    implementing it, can all be found at the University of Washington's *IMAP
-   Information Center* (http://www.washington.edu/imap/).
+   Information Center* (https://www.washington.edu/imap/).
 
 
 .. _imap4-objects:
@@ -507,7 +507,7 @@ An :class:`IMAP4` instance has the following methods:
       allowed creation of such tags, and popular IMAP servers, such as Gmail,
       accept and produce such flags.  There are non-Python programs which also
       create such tags.  Although it is an RFC violation and IMAP clients and
-      servers are supposed to be strict, imaplib nontheless continues to allow
+      servers are supposed to be strict, imaplib nonetheless continues to allow
       such tags to be created for backward compatibility reasons, and as of
       python 3.6, handles them if they are sent from the server, since this
       improves real-world compatibility.

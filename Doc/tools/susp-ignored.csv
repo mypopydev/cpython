@@ -198,6 +198,7 @@ library/unittest,,:first,"self.assertEqual(cm.output, ['INFO:foo:first message',
 library/unittest,,:foo,'ERROR:foo.bar:second message'])
 library/unittest,,:second,'ERROR:foo.bar:second message'])
 library/urllib.request,,:close,Connection:close
+library/urllib.request,,:port,:port
 library/urllib.request,,:lang,"xmlns=""http://www.w3.org/1999/xhtml"" xml:lang=""en"" lang=""en"">\n\n<head>\n"
 library/urllib.request,,:password,"""joe:password@python.org"""
 library/uuid,,:uuid,urn:uuid:12345678-1234-5678-1234-567812345678
@@ -271,6 +272,7 @@ whatsnew/3.2,,:feed,>>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:
 whatsnew/3.2,,:gz,">>> with tarfile.open(name='myarchive.tar.gz', mode='w:gz') as tf:"
 whatsnew/3.2,,:location,zope9-location = ${zope9:location}
 whatsnew/3.2,,:prefix,zope-conf = ${custom:prefix}/etc/zope.conf
+whatsnew/changelog,,:version,import sys; I = version[:version.index(' ')]
 whatsnew/changelog,,:gz,": TarFile opened with external fileobj and ""w:gz"" mode didn't"
 whatsnew/changelog,,::,": Use ""127.0.0.1"" or ""::1"" instead of ""localhost"" as much as"
 library/tarfile,149,:xz,'x:xz'
@@ -281,9 +283,9 @@ library/xml.etree.elementtree,301,:character,<fictional:character>Archie Leach</
 library/xml.etree.elementtree,301,:character,<fictional:character>Sir Robin</fictional:character>
 library/xml.etree.elementtree,301,:character,<fictional:character>Gunther</fictional:character>
 library/xml.etree.elementtree,301,:character,<fictional:character>Commander Clement</fictional:character>
-library/xml.etree.elementtree,332,:actor,"for actor in root.findall('real_person:actor', ns):"
-library/xml.etree.elementtree,332,:name,"name = actor.find('real_person:name', ns)"
-library/xml.etree.elementtree,332,:character,"for char in actor.findall('role:character', ns):"
+library/xml.etree.elementtree,,:actor,"for actor in root.findall('real_person:actor', ns):"
+library/xml.etree.elementtree,,:name,"name = actor.find('real_person:name', ns)"
+library/xml.etree.elementtree,,:character,"for char in actor.findall('role:character', ns):"
 library/zipapp,31,:main,"$ python -m zipapp myapp -m ""myapp:main"""
 library/zipapp,82,:fn,"argument should have the form ""pkg.mod:fn"", where ""pkg.mod"" is a"
 library/zipapp,155,:callable,"""pkg.module:callable"" and the archive will be run by importing"

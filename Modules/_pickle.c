@@ -573,7 +573,7 @@ typedef struct PicklerObject {
     int bin;                    /* Boolean, true if proto > 0 */
     int framing;                /* True when framing is enabled, proto >= 4 */
     Py_ssize_t frame_start;     /* Position in output_buffer where the
-                                   where the current frame begins. -1 if there
+                                   current frame begins. -1 if there
                                    is no frame currently open. */
 
     Py_ssize_t buf_size;        /* Size of the current buffered pickle data */
@@ -869,7 +869,7 @@ PyMemoTable_Set(PyMemoTable *self, PyObject *key, Py_ssize_t value)
 static int
 _Pickler_ClearBuffer(PicklerObject *self)
 {
-    Py_SETREF(self->output_buffer,
+    Py_XSETREF(self->output_buffer,
               PyBytes_FromStringAndSize(NULL, self->max_output_len));
     if (self->output_buffer == NULL)
         return -1;
@@ -1119,7 +1119,7 @@ _Unpickler_SkipConsumed(UnpicklerObject *self)
         return 0;
 
     assert(self->peek);  /* otherwise we did something wrong */
-    /* This makes an useless copy... */
+    /* This makes a useless copy... */
     r = PyObject_CallFunction(self->read, "n", consumed);
     if (r == NULL)
         return -1;
@@ -1197,21 +1197,9 @@ _Unpickler_ReadFromFile(UnpicklerObject *self, Py_ssize_t n)
     return read_size;
 }
 
-/* Read `n` bytes from the unpickler's data source, storing the result in `*s`.
-
-   This should be used for all data reads, rather than accessing the unpickler's
-   input buffer directly. This method deals correctly with reading from input
-   streams, which the input buffer doesn't deal with.
-
-   Note that when reading from a file-like object, self->next_read_idx won't
-   be updated (it should remain at 0 for the entire unpickling process). You
-   should use this function's return value to know how many bytes you can
-   consume.
-
-   Returns -1 (with an exception set) on failure. On success, return the
-   number of chars read. */
+/* Don't call it directly: use _Unpickler_Read() */
 static Py_ssize_t
-_Unpickler_Read(UnpicklerObject *self, char **s, Py_ssize_t n)
+_Unpickler_ReadImpl(UnpicklerObject *self, char **s, Py_ssize_t n)
 {
     Py_ssize_t num_read;
 
@@ -1222,11 +1210,10 @@ _Unpickler_Read(UnpicklerObject *self, char **s, Py_ssize_t n)
                         "read would overflow (invalid bytecode)");
         return -1;
     }
-    if (self->next_read_idx + n <= self->input_len) {
-        *s = self->input_buffer + self->next_read_idx;
-        self->next_read_idx += n;
-        return n;
-    }
+
+    /* This case is handled by the _Unpickler_Read() macro for efficiency */
+    assert(self->next_read_idx + n > self->input_len);
+
     if (!self->read) {
         PyErr_Format(PyExc_EOFError, "Ran out of input");
         return -1;
@@ -1242,6 +1229,26 @@ _Unpickler_Read(UnpicklerObject *self, char **s, Py_ssize_t n)
     self->next_read_idx = n;
     return n;
 }
+
+/* Read `n` bytes from the unpickler's data source, storing the result in `*s`.
+
+   This should be used for all data reads, rather than accessing the unpickler's
+   input buffer directly. This method deals correctly with reading from input
+   streams, which the input buffer doesn't deal with.
+
+   Note that when reading from a file-like object, self->next_read_idx won't
+   be updated (it should remain at 0 for the entire unpickling process). You
+   should use this function's return value to know how many bytes you can
+   consume.
+
+   Returns -1 (with an exception set) on failure. On success, return the
+   number of chars read. */
+#define _Unpickler_Read(self, s, n) \
+    (((n) <= (self)->input_len - (self)->next_read_idx)      \
+     ? (*(s) = (self)->input_buffer + (self)->next_read_idx, \
+        (self)->next_read_idx += (n),                        \
+        (n))                                                 \
+     : _Unpickler_ReadImpl(self, (s), (n)))
 
 static Py_ssize_t
 _Unpickler_CopyLine(UnpicklerObject *self, char *line, Py_ssize_t len,
@@ -3116,7 +3123,7 @@ fix_imports(PyObject **module_name, PyObject **global_name)
             return -1;
         }
         Py_INCREF(item);
-        Py_SETREF(*module_name, item);
+        Py_XSETREF(*module_name, item);
     }
     else if (PyErr_Occurred()) {
         return -1;
@@ -4465,7 +4472,7 @@ Pickler_set_memo(PicklerObject *self, PyObject *obj)
     }
     else {
         PyErr_Format(PyExc_TypeError,
-                     "'memo' attribute must be an PicklerMemoProxy object"
+                     "'memo' attribute must be a PicklerMemoProxy object"
                      "or dict, not %.200s", Py_TYPE(obj)->tp_name);
         return -1;
     }
@@ -4506,7 +4513,7 @@ Pickler_set_persid(PicklerObject *self, PyObject *value)
     }
 
     Py_INCREF(value);
-    Py_SETREF(self->pers_func, value);
+    Py_XSETREF(self->pers_func, value);
 
     return 0;
 }
@@ -4703,7 +4710,7 @@ calc_binsize(char *bytes, int nbytes)
 
 /* s contains x bytes of a little-endian integer.  Return its value as a
  * C int.  Obscure:  when x is 1 or 2, this is an unsigned little-endian
- * int, but when x is 4 it's a signed one.  This is an historical source
+ * int, but when x is 4 it's a signed one.  This is a historical source
  * of x-platform bugs.
  */
 static long
@@ -6607,7 +6614,7 @@ binary file object opened for reading, an io.BytesIO object, or any
 other custom object that meets this interface.
 
 Optional keyword arguments are *fix_imports*, *encoding* and *errors*,
-which are used to control compatiblity support for pickle stream
+which are used to control compatibility support for pickle stream
 generated by Python 2.  If *fix_imports* is True, pickle will try to
 map the old Python 2 names to the new names used in Python 3.  The
 *encoding* and *errors* tell pickle how to decode 8-bit string
@@ -6620,7 +6627,7 @@ static int
 _pickle_Unpickler___init___impl(UnpicklerObject *self, PyObject *file,
                                 int fix_imports, const char *encoding,
                                 const char *errors)
-/*[clinic end generated code: output=e2c8ce748edc57b0 input=04ece661aa884837]*/
+/*[clinic end generated code: output=e2c8ce748edc57b0 input=f9b7da04f5f4f335]*/
 {
     _Py_IDENTIFIER(persistent_load);
 
@@ -6955,7 +6962,7 @@ Unpickler_set_persload(UnpicklerObject *self, PyObject *value)
     }
 
     Py_INCREF(value);
-    Py_SETREF(self->pers_func, value);
+    Py_XSETREF(self->pers_func, value);
 
     return 0;
 }
@@ -7149,7 +7156,7 @@ binary file object opened for reading, an io.BytesIO object, or any
 other custom object that meets this interface.
 
 Optional keyword arguments are *fix_imports*, *encoding* and *errors*,
-which are used to control compatiblity support for pickle stream
+which are used to control compatibility support for pickle stream
 generated by Python 2.  If *fix_imports* is True, pickle will try to
 map the old Python 2 names to the new names used in Python 3.  The
 *encoding* and *errors* tell pickle how to decode 8-bit string
@@ -7161,7 +7168,7 @@ string instances as bytes objects.
 static PyObject *
 _pickle_load_impl(PyModuleDef *module, PyObject *file, int fix_imports,
                   const char *encoding, const char *errors)
-/*[clinic end generated code: output=798f1c57cb2b4eb1 input=2df7c7a1e6742204]*/
+/*[clinic end generated code: output=798f1c57cb2b4eb1 input=01b44dd3fc07afa7]*/
 {
     PyObject *result;
     UnpicklerObject *unpickler = _Unpickler_New();
@@ -7203,7 +7210,7 @@ protocol argument is needed.  Bytes past the pickled object's
 representation are ignored.
 
 Optional keyword arguments are *fix_imports*, *encoding* and *errors*,
-which are used to control compatiblity support for pickle stream
+which are used to control compatibility support for pickle stream
 generated by Python 2.  If *fix_imports* is True, pickle will try to
 map the old Python 2 names to the new names used in Python 3.  The
 *encoding* and *errors* tell pickle how to decode 8-bit string
@@ -7215,7 +7222,7 @@ string instances as bytes objects.
 static PyObject *
 _pickle_loads_impl(PyModuleDef *module, PyObject *data, int fix_imports,
                    const char *encoding, const char *errors)
-/*[clinic end generated code: output=61e9cdb01e36a736 input=f57f0fdaa2b4cb8b]*/
+/*[clinic end generated code: output=61e9cdb01e36a736 input=70605948a719feb9]*/
 {
     PyObject *result;
     UnpicklerObject *unpickler = _Unpickler_New();

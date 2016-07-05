@@ -4,6 +4,9 @@
 .. module:: os
    :synopsis: Miscellaneous operating system interfaces.
 
+**Source code:** :source:`Lib/os.py`
+
+--------------
 
 This module provides a portable way of using operating system dependent
 functionality.  If you just want to read or write a file see :func:`open`, if
@@ -168,22 +171,59 @@ process and user.
 
 .. function:: fsencode(filename)
 
-   Encode *filename* to the filesystem encoding with ``'surrogateescape'``
-   error handler, or ``'strict'`` on Windows; return :class:`bytes` unchanged.
+   Encode :term:`path-like <path-like object>` *filename* to the filesystem
+   encoding with ``'surrogateescape'`` error handler, or ``'strict'`` on
+   Windows; return :class:`bytes` unchanged.
 
    :func:`fsdecode` is the reverse function.
 
    .. versionadded:: 3.2
 
+   .. versionchanged:: 3.6
+      Support added to accept objects implementing the :class:`os.PathLike`
+      interface.
+
 
 .. function:: fsdecode(filename)
 
-   Decode *filename* from the filesystem encoding with ``'surrogateescape'``
-   error handler, or ``'strict'`` on Windows; return :class:`str` unchanged.
+   Decode the :term:`path-like <path-like object>` *filename* from the
+   filesystem encoding with ``'surrogateescape'`` error handler, or ``'strict'``
+   on Windows; return :class:`str` unchanged.
 
    :func:`fsencode` is the reverse function.
 
    .. versionadded:: 3.2
+
+   .. versionchanged:: 3.6
+      Support added to accept objects implementing the :class:`os.PathLike`
+      interface.
+
+
+.. function:: fspath(path)
+
+   Return the file system representation of the path.
+
+   If :class:`str` or :class:`bytes` is passed in, it is returned unchanged.
+   Otherwise :meth:`~os.PathLike.__fspath__` is called and its value is
+   returned as long as it is a :class:`str` or :class:`bytes` object.
+   In all other cases, :exc:`TypeError` is raised.
+
+   .. versionadded:: 3.6
+
+
+.. class:: PathLike
+
+   An :term:`abstract base class` for objects representing a file system path,
+   e.g. :class:`pathlib.PurePath`.
+
+   .. versionadded:: 3.6
+
+   .. abstractmethod:: __fspath__()
+
+      Return the file system path representation of the object.
+
+      The method should only return a :class:`str` or :class:`bytes` object,
+      with the preference being for :class:`str`.
 
 
 .. function:: getenv(key, default=None)
@@ -1192,7 +1232,11 @@ or `the MSDN <https://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windo
 .. function:: writev(fd, buffers)
 
    Write the contents of *buffers* to file descriptor *fd*. *buffers* must be a
-   sequence of :term:`bytes-like objects <bytes-like object>`.
+   sequence of :term:`bytes-like objects <bytes-like object>`. Buffers are
+   processed in array order. Entire contents of first buffer is written before
+   proceeding to second, and so on. The operating system may set a limit
+   (sysconf() value SC_IOV_MAX) on the number of buffers that can be used.
+
    :func:`~os.writev` writes the contents of each object to the file descriptor
    and returns the total number of bytes written.
 
@@ -1623,9 +1667,15 @@ features:
 
    Create a directory named *path* with numeric mode *mode*.
 
+   If the directory already exists, :exc:`FileExistsError` is raised.
+
+   .. _mkdir_modebits:
+
    On some systems, *mode* is ignored.  Where it is used, the current umask
-   value is first masked out.  If the directory already exists, :exc:`OSError`
-   is raised.
+   value is first masked out.  If bits other than the last 9 (i.e. the last 3
+   digits of the octal representation of the *mode*) are set, their meaning is
+   platform-dependent.  On some platforms, they are ignored and you should call
+   :func:`chmod` explicitly to set them.
 
    This function can also support :ref:`paths relative to directory descriptors
    <dir_fd>`.
@@ -1646,8 +1696,8 @@ features:
    Recursive directory creation function.  Like :func:`mkdir`, but makes all
    intermediate-level directories needed to contain the leaf directory.
 
-   The default *mode* is ``0o777`` (octal).  On some systems, *mode* is
-   ignored.  Where it is used, the current umask value is first masked out.
+   The *mode* parameter is passed to :func:`mkdir`; see :ref:`the mkdir()
+   description <mkdir_modebits>` for how it is interpreted.
 
    If *exist_ok* is ``False`` (the default), an :exc:`OSError` is raised if the
    target directory already exists.
@@ -1762,7 +1812,7 @@ features:
    ``os.path.join(os.path.dirname(path), result)``.
 
    If the *path* is a string object, the result will also be a string object,
-   and the call may raise an UnicodeDecodeError. If the *path* is a bytes
+   and the call may raise a UnicodeDecodeError. If the *path* is a bytes
    object, the result will be a bytes object.
 
    This function can also support :ref:`paths relative to directory descriptors
@@ -1870,25 +1920,26 @@ features:
 
 .. function:: scandir(path='.')
 
-   Return an iterator of :class:`DirEntry` objects corresponding to the entries
-   in the directory given by *path*. The entries are yielded in arbitrary
-   order, and the special entries ``'.'`` and ``'..'`` are not included.
+   Return an iterator of :class:`os.DirEntry` objects corresponding to the
+   entries in the directory given by *path*. The entries are yielded in
+   arbitrary order, and the special entries ``'.'`` and ``'..'`` are not
+   included.
 
    Using :func:`scandir` instead of :func:`listdir` can significantly
    increase the performance of code that also needs file type or file
-   attribute information, because :class:`DirEntry` objects expose this
+   attribute information, because :class:`os.DirEntry` objects expose this
    information if the operating system provides it when scanning a directory.
-   All :class:`DirEntry` methods may perform a system call, but
-   :func:`~DirEntry.is_dir` and :func:`~DirEntry.is_file` usually only
-   require a system call for symbolic links; :func:`DirEntry.stat`
+   All :class:`os.DirEntry` methods may perform a system call, but
+   :func:`~os.DirEntry.is_dir` and :func:`~os.DirEntry.is_file` usually only
+   require a system call for symbolic links; :func:`os.DirEntry.stat`
    always requires a system call on Unix but only requires one for
    symbolic links on Windows.
 
    On Unix, *path* can be of type :class:`str` or :class:`bytes` (use
    :func:`~os.fsencode` and :func:`~os.fsdecode` to encode and decode
    :class:`bytes` paths). On Windows, *path* must be of type :class:`str`.
-   On both sytems, the type of the :attr:`~DirEntry.name` and
-   :attr:`~DirEntry.path` attributes of each :class:`DirEntry` will be of
+   On both sytems, the type of the :attr:`~os.DirEntry.name` and
+   :attr:`~os.DirEntry.path` attributes of each :class:`os.DirEntry` will be of
    the same type as *path*.
 
    The :func:`scandir` iterator supports the :term:`context manager` protocol
@@ -1943,19 +1994,22 @@ features:
 
    :func:`scandir` will provide as much of this information as possible without
    making additional system calls. When a ``stat()`` or ``lstat()`` system call
-   is made, the ``DirEntry`` object will cache the result.
+   is made, the ``os.DirEntry`` object will cache the result.
 
-   ``DirEntry`` instances are not intended to be stored in long-lived data
+   ``os.DirEntry`` instances are not intended to be stored in long-lived data
    structures; if you know the file metadata has changed or if a long time has
    elapsed since calling :func:`scandir`, call ``os.stat(entry.path)`` to fetch
    up-to-date information.
 
-   Because the ``DirEntry`` methods can make operating system calls, they may
+   Because the ``os.DirEntry`` methods can make operating system calls, they may
    also raise :exc:`OSError`. If you need very fine-grained
    control over errors, you can catch :exc:`OSError` when calling one of the
-   ``DirEntry`` methods and handle as appropriate.
+   ``os.DirEntry`` methods and handle as appropriate.
 
-   Attributes and methods on a ``DirEntry`` instance are as follows:
+   To be directly usable as a :term:`path-like object`, ``os.DirEntry``
+   implements the :class:`os.PathLike` interface.
+
+   Attributes and methods on a ``os.DirEntry`` instance are as follows:
 
    .. attribute:: name
 
@@ -1981,8 +2035,9 @@ features:
 
       Return the inode number of the entry.
 
-      The result is cached on the ``DirEntry`` object. Use ``os.stat(entry.path,
-      follow_symlinks=False).st_ino`` to fetch up-to-date information.
+      The result is cached on the ``os.DirEntry`` object. Use
+      ``os.stat(entry.path, follow_symlinks=False).st_ino`` to fetch up-to-date
+      information.
 
       On the first, uncached call, a system call is required on Windows but
       not on Unix.
@@ -1997,7 +2052,7 @@ features:
       is a directory (without following symlinks); return ``False`` if the
       entry is any other kind of file or if it doesn't exist anymore.
 
-      The result is cached on the ``DirEntry`` object, with a separate cache
+      The result is cached on the ``os.DirEntry`` object, with a separate cache
       for *follow_symlinks* ``True`` and ``False``. Call :func:`os.stat` along
       with :func:`stat.S_ISDIR` to fetch up-to-date information.
 
@@ -2021,8 +2076,8 @@ features:
       is a file (without following symlinks); return ``False`` if the entry is
       a directory or other non-file entry, or if it doesn't exist anymore.
 
-      The result is cached on the ``DirEntry`` object. Caching, system calls
-      made, and exceptions raised are as per :func:`~DirEntry.is_dir`.
+      The result is cached on the ``os.DirEntry`` object. Caching, system calls
+      made, and exceptions raised are as per :func:`~os.DirEntry.is_dir`.
 
    .. method:: is_symlink()
 
@@ -2030,7 +2085,7 @@ features:
       return ``False`` if the entry points to a directory or any kind of file,
       or if it doesn't exist anymore.
 
-      The result is cached on the ``DirEntry`` object. Call
+      The result is cached on the ``os.DirEntry`` object. Call
       :func:`os.path.islink` to fetch up-to-date information.
 
       On the first, uncached call, no system call is required in most cases.
@@ -2055,17 +2110,20 @@ features:
       :class:`stat_result` are always set to zero. Call :func:`os.stat` to
       get these attributes.
 
-      The result is cached on the ``DirEntry`` object, with a separate cache
+      The result is cached on the ``os.DirEntry`` object, with a separate cache
       for *follow_symlinks* ``True`` and ``False``. Call :func:`os.stat` to
       fetch up-to-date information.
 
    Note that there is a nice correspondence between several attributes
-   and methods of ``DirEntry`` and of :class:`pathlib.Path`.  In
-   particular, the ``name`` and ``path`` attributes have the same
+   and methods of ``os.DirEntry`` and of :class:`pathlib.Path`.  In
+   particular, the ``name`` attribute has the same
    meaning, as do the ``is_dir()``, ``is_file()``, ``is_symlink()``
    and ``stat()`` methods.
 
    .. versionadded:: 3.5
+
+   .. versionchanged:: 3.6
+      Added support for the :class:`os.PathLike` interface.
 
 
 .. function:: stat(path, \*, dir_fd=None, follow_symlinks=True)
@@ -3507,7 +3565,7 @@ operating system.
 
 .. data:: SCHED_RESET_ON_FORK
 
-   This flag can OR'ed with any other scheduling policy. When a process with
+   This flag can be OR'ed with any other scheduling policy. When a process with
    this flag set forks, its child's scheduling policy and priority are reset to
    the default.
 
@@ -3759,13 +3817,20 @@ Miscellaneous Functions
 
    This function returns random bytes from an OS-specific randomness source.  The
    returned data should be unpredictable enough for cryptographic applications,
-   though its exact quality depends on the OS implementation.  On a Unix-like
-   system this will query ``/dev/urandom``, and on Windows it will use
-   ``CryptGenRandom()``.  If a randomness source is not found,
+   though its exact quality depends on the OS implementation.
+
+   On Linux, ``getrandom()`` syscall is used if available and the urandom
+   entropy pool is initialized (``getrandom()`` does not block).
+   On a Unix-like system this will query ``/dev/urandom``. On Windows, it
+   will use ``CryptGenRandom()``.  If a randomness source is not found,
    :exc:`NotImplementedError` will be raised.
 
    For an easy-to-use interface to the random number generator
    provided by your platform, please see :class:`random.SystemRandom`.
+
+   .. versionchanged:: 3.5.2
+      On Linux, if ``getrandom()`` blocks (the urandom entropy pool is not
+      initialized yet), fall back on reading ``/dev/urandom``.
 
    .. versionchanged:: 3.5
       On Linux 3.17 and newer, the ``getrandom()`` syscall is now used

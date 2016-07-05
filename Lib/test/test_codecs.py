@@ -4,7 +4,6 @@ import io
 import locale
 import sys
 import unittest
-import warnings
 import encodings
 
 from test import support
@@ -2401,7 +2400,7 @@ class TypesTest(unittest.TestCase):
             self.assertRaises(TypeError, decoder, "xxx")
 
     def test_unicode_escape(self):
-        # Escape-decoding an unicode string is supported ang gives the same
+        # Escape-decoding a unicode string is supported and gives the same
         # result as decoding the equivalent ASCII bytes string.
         self.assertEqual(codecs.unicode_escape_decode(r"\u1234"), ("\u1234", 6))
         self.assertEqual(codecs.unicode_escape_decode(br"\u1234"), ("\u1234", 6))
@@ -2809,7 +2808,7 @@ class TransformCodecTest(unittest.TestCase):
 # type and a single str argument.
 
 # Use a local codec registry to avoid appearing to leak objects when
-# registering multiple seach functions
+# registering multiple search functions
 _TEST_CODECS = {}
 
 def _get_test_codec(codec_name):

@@ -238,6 +238,9 @@ class CAPITest(unittest.TestCase):
                              'return_result_with_error.* '
                              'returned a result with an error set')
 
+    def test_buildvalue_N(self):
+        _testcapi.test_buildvalue_N()
+
 
 @unittest.skipUnless(threading, 'Threading required for this test.')
 class TestPendingCalls(unittest.TestCase):
@@ -461,7 +464,7 @@ class SkipitemTest(unittest.TestCase):
         test and not for the other, there's a mismatch, and the test fails.
 
            ** Some format units have special funny semantics and it would
-              be difficult to accomodate them here.  Since these are all
+              be difficult to accommodate them here.  Since these are all
               well-established and properly skipped in skipitem() we can
               get away with not testing them--this test is really intended
               to catch *new* format units.
@@ -523,6 +526,31 @@ class SkipitemTest(unittest.TestCase):
                           (), {}, b'', [''] * 42)
         self.assertRaises(ValueError, _testcapi.parse_tuple_and_keywords,
                           (), {}, b'', [42])
+
+    def test_positional_only(self):
+        parse = _testcapi.parse_tuple_and_keywords
+
+        parse((1, 2, 3), {}, b'OOO', ['', '', 'a'])
+        parse((1, 2), {'a': 3}, b'OOO', ['', '', 'a'])
+        with self.assertRaisesRegex(TypeError,
+                'Function takes at least 2 positional arguments \(1 given\)'):
+            parse((1,), {'a': 3}, b'OOO', ['', '', 'a'])
+        parse((1,), {}, b'O|OO', ['', '', 'a'])
+        with self.assertRaisesRegex(TypeError,
+                'Function takes at least 1 positional arguments \(0 given\)'):
+            parse((), {}, b'O|OO', ['', '', 'a'])
+        parse((1, 2), {'a': 3}, b'OO$O', ['', '', 'a'])
+        with self.assertRaisesRegex(TypeError,
+                'Function takes exactly 2 positional arguments \(1 given\)'):
+            parse((1,), {'a': 3}, b'OO$O', ['', '', 'a'])
+        parse((1,), {}, b'O|O$O', ['', '', 'a'])
+        with self.assertRaisesRegex(TypeError,
+                'Function takes at least 1 positional arguments \(0 given\)'):
+            parse((), {}, b'O|O$O', ['', '', 'a'])
+        with self.assertRaisesRegex(SystemError, 'Empty parameter name after \$'):
+            parse((1,), {}, b'O|$OO', ['', '', 'a'])
+        with self.assertRaisesRegex(SystemError, 'Empty keyword'):
+            parse((1,), {}, b'O|OO', ['', 'a', ''])
 
 
 @unittest.skipUnless(threading, 'Threading required for this test.')

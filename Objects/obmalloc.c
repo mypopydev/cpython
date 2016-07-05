@@ -166,7 +166,7 @@ _PyObject_ArenaFree(void *ctx, void *ptr, size_t size)
 #else
 #  define PYOBJ_FUNCS PYRAW_FUNCS
 #endif
-#define PYMEM_FUNCS PYRAW_FUNCS
+#define PYMEM_FUNCS PYOBJ_FUNCS
 
 typedef struct {
     /* We tag each block with an API ID in order to tag API violations */
@@ -252,10 +252,11 @@ _PyMem_SetupAllocators(const char *opt)
     else if (strcmp(opt, "pymalloc") == 0
              || strcmp(opt, "pymalloc_debug") == 0)
     {
-        PyMemAllocatorEx mem_alloc = {NULL, PYRAW_FUNCS};
+        PyMemAllocatorEx raw_alloc = {NULL, PYRAW_FUNCS};
+        PyMemAllocatorEx mem_alloc = {NULL, PYMEM_FUNCS};
         PyMemAllocatorEx obj_alloc = {NULL, PYOBJ_FUNCS};
 
-        PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &mem_alloc);
+        PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &raw_alloc);
         PyMem_SetAllocator(PYMEM_DOMAIN_MEM, &mem_alloc);
         PyMem_SetAllocator(PYMEM_DOMAIN_OBJ, &obj_alloc);
 
@@ -286,13 +287,13 @@ static PyObjectArenaAllocator _PyObject_Arena = {NULL,
 #endif
     };
 
+#ifdef WITH_PYMALLOC
 static int
 _PyMem_DebugEnabled(void)
 {
     return (_PyObject.malloc == _PyMem_DebugMalloc);
 }
 
-#ifdef WITH_PYMALLOC
 int
 _PyMem_PymallocEnabled(void)
 {

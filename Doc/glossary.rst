@@ -76,13 +76,12 @@ Glossary
 
    asynchronous iterable
       An object, that can be used in an :keyword:`async for` statement.
-      Must return an :term:`awaitable` from its :meth:`__aiter__` method,
-      which should in turn be resolved in an :term:`asynchronous iterator`
-      object.  Introduced by :pep:`492`.
+      Must return an :term:`asynchronous iterator` from its
+      :meth:`__aiter__` method.  Introduced by :pep:`492`.
 
    asynchronous iterator
       An object that implements :meth:`__aiter__` and :meth:`__anext__`
-      methods, that must return :term:`awaitable` objects.
+      methods.  ``__anext__`` must return an :term:`awaitable` object.
       :keyword:`async for` resolves awaitable returned from asynchronous
       iterator's :meth:`__anext__` method until it raises
       :exc:`StopAsyncIteration` exception.  Introduced by :pep:`492`.
@@ -177,7 +176,7 @@ Glossary
       A buffer is considered contiguous exactly if it is either
       *C-contiguous* or *Fortran contiguous*.  Zero-dimensional buffers are
       C and Fortran contiguous.  In one-dimensional arrays, the items
-      must be layed out in memory next to each other, in order of
+      must be laid out in memory next to each other, in order of
       increasing indexes starting from zero.  In multidimensional
       C-contiguous arrays, the last index varies the fastest when
       visiting items in order of memory address.  However, in
@@ -719,6 +718,8 @@ Glossary
 
            def func(foo, bar=None): ...
 
+      .. _positional-only_parameter:
+
       * :dfn:`positional-only`: specifies an argument that can be supplied only
         by position.  Python has no syntax for defining positional-only
         parameters.  However, some built-in functions have positional-only
@@ -776,6 +777,16 @@ Glossary
    path based finder
       One of the default :term:`meta path finders <meta path finder>` which
       searches an :term:`import path` for modules.
+
+   path-like object
+      An object representing a file system path. A path-like object is either
+      a :class:`str` or :class:`bytes` object representing a path, or an object
+      implementing the :class:`os.PathLike` protocol. An object that supports
+      the :class:`os.PathLike` protocol can be converted to a :class:`str` or
+      :class:`bytes` file system path by calling the :func:`os.fspath` function;
+      :func:`os.fsdecode` and :func:`os.fsencode` can be used to guarantee a
+      :class:`str` or :class:`bytes` result instead, respectively. Introduced
+      by :pep:`519`.
 
    portion
       A set of files in a single directory (possibly stored in a zip file)

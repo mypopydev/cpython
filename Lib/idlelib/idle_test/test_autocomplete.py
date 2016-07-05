@@ -1,10 +1,14 @@
+''' Test autocomplete and autocomple_w
+
+Coverage of autocomple: 56%
+'''
 import unittest
 from test.support import requires
 from tkinter import Tk, Text
 
-import idlelib.AutoComplete as ac
-import idlelib.AutoCompleteWindow as acw
-import idlelib.macosxSupport as mac
+import idlelib.autocomplete as ac
+import idlelib.autocomplete_w as acw
+from idlelib import macosx
 from idlelib.idle_test.mock_idle import Func
 from idlelib.idle_test.mock_tk import Event
 
@@ -27,15 +31,14 @@ class AutoCompleteTest(unittest.TestCase):
     def setUpClass(cls):
         requires('gui')
         cls.root = Tk()
-        mac.setupApp(cls.root, None)
+        macosx.setupApp(cls.root, None)
         cls.text = Text(cls.root)
         cls.editor = DummyEditwin(cls.root, cls.text)
 
     @classmethod
     def tearDownClass(cls):
+        del cls.editor, cls.text
         cls.root.destroy()
-        del cls.text
-        del cls.editor
         del cls.root
 
     def setUp(self):
